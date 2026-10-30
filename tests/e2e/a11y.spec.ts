@@ -2,15 +2,21 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { completeOnboarding } from './helpers';
 
-const PAGES = ['#/', '#/muscu', '#/muscu?tab=programs', '#/muscu?tab=library', '#/course', '#/course/forme', '#/course/carte', '#/course/chaussures', '#/course/seances', '#/nutrition', '#/nutrition?tab=foods', '#/coach', '#/plus', '#/planning', '#/progres', '#/rapports', '#/profil', '#/parametres', '#/installer'];
+const PAGES = ['#/', '#/muscu', '#/muscu?tab=programs', '#/muscu?tab=library', '#/course', '#/course/forme', '#/course/carte', '#/course/chaussures', '#/course/seances', '#/nutrition', '#/nutrition?tab=foods', '#/nutrition?tab=plan', '#/nutrition?tab=recipes', '#/coach', '#/plus', '#/planning', '#/progres', '#/rapports', '#/profil', '#/parametres', '#/installer'];
 
 for (const theme of ['dark', 'light'] as const) {
   test(`accessibilité (axe, WCAG 2.1 AA) — thème ${theme}`, async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(150_000);
+    // Animations désactivées (préférence « réduire les animations », gérée par l'app) : axe ne doit
+    // pas mesurer les contrastes pendant le fondu d'apparition des cartes.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await completeOnboarding(page);
     if (theme === 'light') {
       await page.goto('./#/parametres');
       await page.getByRole('radio', { name: 'Clair' }).click();
+      // Thème réellement appliqué (et enregistré) avant de mesurer les contrastes.
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      await page.waitForTimeout(500);
     }
     const problems: string[] = [];
     for (const path of PAGES) {

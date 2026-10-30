@@ -32,7 +32,7 @@ import { activityStreak, weeklyTrend } from '@/lib/stats';
 import { formatDuration, runRecords } from '@/lib/running';
 import { isStandalone } from '../install/platform';
 import { allRecords, startSession } from '../workouts/service';
-import { DaySummary } from '../nutrition/NutritionPage';
+import { DaySummary } from '../nutrition/DaySummary';
 import { WaterTracker } from '../nutrition/WaterTracker';
 import { dayItems } from '../nutrition/service';
 import { nextAction, todayItems, type TodayKey } from './today';

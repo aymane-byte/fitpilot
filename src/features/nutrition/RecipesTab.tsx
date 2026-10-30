@@ -12,6 +12,7 @@ import { fmt, num, t } from '@/i18n';
 import { nutrientsFor, recipePer100g } from '@/lib/nutrition';
 import { FoodRow, FoodSearchBar, useFoodSearch } from './FoodSheets';
 import { saveRecipe } from './service';
+import { servingGrams } from '@/lib/mealPlan';
 
 const n = t.nutrition;
 
@@ -103,13 +104,22 @@ function RecipeEditor({ initial, onClose }: { initial: Recipe; onClose: () => vo
               {n.addIngredient}
             </Button>
           </div>
-          <NumberField label={n.cookedWeight} unit="g" value={r.cookedWeightG} onChange={(cookedWeightG) => setR({ ...r, cookedWeightG })} hint={n.cookedWeightHint} />
+          <p className="-mt-2 text-xs text-muted">{t.nx.rawNote}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField label={n.cookedWeight} unit="g" value={r.cookedWeightG} onChange={(cookedWeightG) => setR({ ...r, cookedWeightG })} hint={n.cookedWeightHint} />
+            <NumberField label={t.nx.servings} value={r.servings} integer onChange={(servings) => setR({ ...r, servings: servings && servings > 0 && servings <= 50 ? servings : undefined })} hint={t.nx.servingsHint} />
+          </div>
           {valid.length > 0 && (
             <Card className="!p-3">
               <p className="num text-sm text-muted">{fmt(n.recipeTotal, { g: num(per.totalG, 0), kcal: num(totalKcal, 0) })}</p>
               <p className="num font-semibold">
                 {per.kcal} kcal · P {num(per.proteinG)} · G {num(per.carbsG)} · L {num(per.fatG)} <span className="text-sm font-normal text-muted">{n.per100}</span>
               </p>
+              {servingGrams(r) && (
+                <p className="num text-sm" data-testid="per-serving">
+                  {fmt(t.nx.perServing, { g: servingGrams(r)!, kcal: Math.round((per.kcal * servingGrams(r)!) / 100) })}
+                </p>
+              )}
             </Card>
           )}
           {error && <p className="text-sm text-danger">{error}</p>}

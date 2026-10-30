@@ -5,25 +5,33 @@ import { BarChart3, ChevronLeft, ChevronRight, Copy, Flame, Plus, Trash2 } from 
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardTitle, Notice } from '@/components/Card';
 import { Button } from '@/components/Button';
-import { MacroBar, ProgressRing } from '@/components/ProgressRing';
 import { Segmented } from '@/components/Segmented';
 import { Sheet } from '@/components/Sheet';
 import { LazyBarTargetChart } from '@/components/LazyTrendChart';
 import { useToast } from '@/components/Toast';
 import { db } from '@/db/db';
 import type { Food, MealItem, MealType } from '@/db/types';
-import { useProfile, useTargets, useWeightEntries } from '@/hooks/useData';
+import { useProfile, useSettings, useTargets, useWeightEntries } from '@/hooks/useData';
+import type { Profile } from '@/db/types';
 import { fmt, num, t } from '@/i18n';
 import { addDays, formatDateFr, todayISO, type ISODate } from '@/lib/dates';
 import type { Targets } from '@/lib/energy';
 import { lastNDays, nutritionReport, sumNutrients } from '@/lib/nutrition';
-import { AddFoodSheet, FoodEditor, FoodRow, FoodSearchBar, useFoodSearch } from './FoodSheets';
+import { FoodEditor, FoodRow, FoodSearchBar, useFoodSearch } from './FoodSheets';
+import { DaySummary } from './DaySummary';
+import { AddFoodSheet } from './AddFoodSheet';
 import { RecipesTab } from './RecipesTab';
-import { copyMeal, dayItems, daysNutrition, MEAL_TYPES, yesterdayHas } from './service';
+import { copyMeal, dayItems, daysNutrition, MEAL_TYPES, microsOfItems, yesterdayHas } from './service';
+import { averageMicros } from '@/lib/micros';
+import { MicrosCard } from './MicrosCard';
+import { RamadanCard } from './RamadanCard';
+import { PlannerTab } from './PlannerTab';
+import { useDayTargets } from './useDayTargets';
+import { mealLabel } from './labels';
 import { WaterTracker } from './WaterTracker';
 
 const n = t.nutrition;
-type Tab = 'journal' | 'foods' | 'recipes' | 'report';
+type Tab = 'journal' | 'foods' | 'recipes' | 'plan' | 'report';
 
 export function NutritionPage() {
   const [params, setParams] = useSearchParams();
@@ -35,47 +43,30 @@ export function NutritionPage() {
     <>
       <PageHeader title={n.title} />
       <main className="mx-auto flex max-w-lg flex-col gap-4 px-4 pb-28">
-        <Segmented<Tab> value={tab} onChange={(v) => setParams({ tab: v }, { replace: true })} options={(['journal', 'foods', 'recipes', 'report'] as const).map((v) => ({ value: v, label: n.tabs[v] }))} />
-        {tab === 'journal' && data && <Journal targets={data.targets} />}
+        <Segmented<Tab> value={tab} onChange={(v) => setParams({ tab: v }, { replace: true })} options={(['journal', 'foods', 'recipes', 'plan', 'report'] as const).map((v) => ({ value: v, label: v === 'plan' ? t.nx.planTab : n.tabs[v] }))} />
+        {tab === 'journal' && data && profile && <Journal targets={data.targets} profile={profile} />}
         {tab === 'foods' && <FoodsTab />}
         {tab === 'recipes' && <RecipesTab />}
-        {tab === 'report' && data && <Report targets={data.targets} />}
+        {tab === 'plan' && <PlannerTab />}
+        {tab === 'report' && data && profile && <Report targets={data.targets} profile={profile} />}
         <p className="text-xs text-muted">{n.valuesNote}</p>
       </main>
     </>
   );
 }
 
-/** Résumé calories + macros d'un jour (réutilisé par le tableau de bord). */
-export function DaySummary({ items, targets }: { items: MealItem[]; targets: Targets }) {
-  const total = sumNutrients(items);
-  const left = targets.calories - total.kcal;
-  return (
-    <div className="flex items-center gap-4">
-      <ProgressRing value={total.kcal} max={targets.calories} size={112} label={`${total.kcal} / ${targets.calories} kcal`} color={left < -targets.calories * 0.1 ? 'var(--warning)' : undefined}>
-        <div>
-          <p className="num text-xl font-bold leading-none" data-testid="kcal-left">
-            {num(Math.abs(left), 0)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted">kcal {left >= 0 ? n.remaining : n.over}</p>
-        </div>
-      </ProgressRing>
-      <div className="flex flex-1 flex-col gap-2.5">
-        <MacroBar label={t.targets.protein} value={total.proteinG} target={targets.proteinG} color="var(--protein)" />
-        <MacroBar label={t.targets.carbs} value={total.carbsG} target={targets.carbsG} color="var(--carbs)" />
-        <MacroBar label={t.targets.fat} value={total.fatG} target={targets.fatG} color="var(--fat)" />
-      </div>
-    </div>
-  );
-}
-
-function Journal({ targets }: { targets: Targets }) {
+function Journal({ targets: base, profile }: { targets: Targets; profile: Profile }) {
   const today = todayISO();
   const [date, setDate] = useState<ISODate>(today);
   const items = useLiveQuery(() => dayItems(date), [date]);
+  const settings = useSettings();
+  const day = useDayTargets(date, profile, base);
   const [adding, setAdding] = useState<MealType | null>(null);
-  if (!items) return null;
+  if (!items || !settings) return null;
   const all = MEAL_TYPES.flatMap((m) => items[m]);
+  // Objectif du jour : cyclage (entraînement / repos) et plafond Ramadan appliqués.
+  const targets: Targets = day ? { ...base, calories: day.calories, carbsG: day.carbsG, proteinG: day.proteinG, fatG: day.fatG } : base;
+  const delta = targets.calories - base.calories;
 
   return (
     <>
@@ -90,21 +81,28 @@ function Journal({ targets }: { targets: Targets }) {
       </div>
       <Card>
         <CardTitle icon={<Flame size={18} />}>{n.consumed}</CardTitle>
+        {day && day.reasons.length > 0 && (
+          <p className="num -mt-1 mb-3 text-xs font-medium text-accent-text" data-testid="day-target-reason">
+            {day.reasons.map((r) => (r === 'training' ? fmt(t.nx.trainingDay, { d: delta }) : r === 'rest' ? fmt(t.nx.restDay, { d: -delta }) : t.nx.ramadanCap)).join(' · ')}
+          </p>
+        )}
         <DaySummary items={all} targets={targets} />
         <div className="mt-4 border-t border-line pt-4">
           <WaterTracker date={date} targetMl={targets.waterMl} />
         </div>
       </Card>
+      <RamadanCard settings={settings} waterMl={targets.waterMl} />
       {all.length === 0 && <Notice>{n.emptyDay}</Notice>}
       {MEAL_TYPES.map((m) => (
-        <MealCard key={m} date={date} meal={m} items={items[m]} onAdd={() => setAdding(m)} />
+        <MealCard key={m} date={date} meal={m} label={mealLabel(m, settings)} items={items[m]} onAdd={() => setAdding(m)} />
       ))}
+      {all.length > 0 && <MicrosCard totals={microsOfItems(all)} profile={profile} kcal={targets.calories} />}
       {adding && <AddFoodSheet date={date} meal={adding} onClose={() => setAdding(null)} />}
     </>
   );
 }
 
-function MealCard({ date, meal, items, onAdd }: { date: ISODate; meal: MealType; items: MealItem[]; onAdd: () => void }) {
+function MealCard({ date, meal, label, items, onAdd }: { date: ISODate; meal: MealType; label: string; items: MealItem[]; onAdd: () => void }) {
   const toast = useToast();
   const canCopy = useLiveQuery(() => (items.length ? false : yesterdayHas(date, meal)), [date, meal, items.length]);
   const total = sumNutrients(items);
@@ -112,7 +110,7 @@ function MealCard({ date, meal, items, onAdd }: { date: ISODate; meal: MealType;
     <Card className="!p-3">
       <div className="flex items-center gap-2 pl-1">
         <h2 className="flex-1 text-[15px] font-semibold">
-          {n.meals[meal]}
+          {label}
           {items.length > 0 && <span className="num ml-2 text-sm font-normal text-muted">{total.kcal} kcal</span>}
         </h2>
         {canCopy && (
@@ -128,7 +126,7 @@ function MealCard({ date, meal, items, onAdd }: { date: ISODate; meal: MealType;
             {n.copyYesterday}
           </Button>
         )}
-        <button type="button" onClick={onAdd} aria-label={fmt(n.addTo, { meal: n.meals[meal].toLowerCase() })} className="grid size-11 place-items-center rounded-xl bg-accent text-accent-ink active:brightness-90">
+        <button type="button" onClick={onAdd} aria-label={fmt(n.addTo, { meal: label.toLowerCase() })} className="grid size-11 place-items-center rounded-xl bg-accent text-accent-ink active:brightness-90">
           <Plus size={20} />
         </button>
       </div>
@@ -137,9 +135,12 @@ function MealCard({ date, meal, items, onAdd }: { date: ISODate; meal: MealType;
           {items.map((i) => (
             <li key={i.id} className="flex items-center gap-2 py-2 pl-1">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px]">{i.name}</span>
+                <span className="block truncate text-[15px]">
+                  {i.name}
+                  {i.estimated && <span className="ml-1.5 rounded-md bg-warning/15 px-1.5 py-0.5 text-[11px] font-semibold text-warning">{t.nx.estimatedTag}</span>}
+                </span>
                 <span className="num block text-xs text-muted">
-                  {i.unitLabel ? `${num(i.qty ?? 1)} × ${i.unitLabel} (${num(i.grams)} g)` : `${num(i.grams)} g`} · P {num(i.proteinG)} · G {num(i.carbsG)} · L {num(i.fatG)}
+                  {i.unitLabel ? `${num(i.qty ?? 1)} × ${i.unitLabel} (${num(i.grams)} g) · ` : i.grams ? `${num(i.grams)} g · ` : ''}P {num(i.proteinG)} · G {num(i.carbsG)} · L {num(i.fatG)}
                 </span>
               </span>
               <span className="num text-sm font-semibold">{i.kcal}</span>
@@ -181,9 +182,13 @@ function FoodsTab() {
   );
 }
 
-function Report({ targets }: { targets: Targets }) {
+function Report({ targets, profile }: { targets: Targets; profile: Profile }) {
   const today = todayISO();
   const days = useLiveQuery(() => daysNutrition(lastNDays(today, 7)), [today]);
+  const micros = useLiveQuery(async () => {
+    const list = await Promise.all(lastNDays(today, 7).map(async (d) => Object.values(await dayItems(d)).flat()));
+    return averageMicros(list.filter((items) => items.length).map((items) => microsOfItems(items)));
+  }, [today]);
   if (!days) return null;
   const r = nutritionReport(days, { kcal: targets.calories, proteinG: targets.proteinG });
   const stats = [
@@ -224,6 +229,7 @@ function Report({ targets }: { targets: Targets }) {
           />
         </Card>
       )}
+      {r.daysLogged > 0 && micros && <MicrosCard totals={micros} profile={profile} kcal={targets.calories} title={`${t.nx.microsTitle} · ${t.nx.microsAvg}`} defaultOpen />}
     </>
   );
 }

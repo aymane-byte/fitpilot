@@ -1,6 +1,7 @@
 // Nutrition : nutriments d'une portion, totaux, recettes, rapport hebdo, allergènes.
 import { addDays, type ISODate } from './dates';
 import { normalizeText } from './text';
+import { MICRO_KEYS, type Micros } from './micros';
 
 export interface Nutrients {
   kcal: number;
@@ -27,6 +28,22 @@ export function sumNutrients(items: Nutrients[]): Nutrients {
     { ...ZERO },
   );
   return { kcal: Math.round(s.kcal), proteinG: r1(s.proteinG), carbsG: r1(s.carbsG), fatG: r1(s.fatG) };
+}
+
+/**
+ * Micronutriments pour 100 g d'une recette. Un micronutriment n'est donné que si TOUS les
+ * ingrédients le renseignent (sinon le total serait faussement bas).
+ */
+export function recipeMicrosPer100g(items: { food: Micros; grams: number }[], cookedWeightG?: number): Micros {
+  const weight = cookedWeightG && cookedWeightG > 0 ? cookedWeightG : items.reduce((s, i) => s + i.grams, 0);
+  const out: Micros = {};
+  if (weight <= 0 || !items.length) return out;
+  for (const k of MICRO_KEYS) {
+    if (!items.every((i) => typeof i.food[k] === 'number')) continue;
+    const total = items.reduce((s, i) => s + (i.food[k] as number) * (i.grams / 100), 0);
+    out[k] = Math.round(((total * 100) / weight) * 1000) / 1000;
+  }
+  return out;
 }
 
 /** Valeurs pour 100 g d'une recette, à partir de ses ingrédients (poids cru = poids de la recette). */

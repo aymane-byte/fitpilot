@@ -18,10 +18,10 @@ Les 6 phases de départ sont terminées. Deuxième série en cours : course avan
 | 5 | Mesures, photos avant/après, rapports, PDF, rappels, export Calendrier | ✅ |
 | 6 | Accessibilité (WCAG 2.1 AA), performance, passe de tests complète | ✅ |
 | A | Course « type Strava » : splits, meilleurs efforts, dénivelé, voix, séances guidées, cartes, charge, VDOT, chaussures, météo, partage, GPX/FIT, objectifs | ✅ |
-| B | Nutrition complète (code-barres, CIQUAL, micronutriments, menus, Ramadan…) | en cours |
+| B | Nutrition complète : code-barres + Open Food Facts, CIQUAL, micronutriments, favoris, repas fréquents, ajout rapide, recettes en portions, menus + courses en DH, cyclage des calories, mode Ramadan, photo IA (option) | ✅ |
 | C | Finitions (tableau de bord, coach, README, tests, déploiement) | à faire |
 
-**Vérifications automatiques** : 224 tests unitaires, 70 tests de bout en bout (iPhone WebKit + Chromium, dont un audit d'accessibilité axe en thème sombre et clair). Lighthouse mobile : Performance 100, Accessibilité 100, Bonnes pratiques 100. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
+**Vérifications automatiques** : 236 tests unitaires, 78 tests de bout en bout (iPhone WebKit + Chromium, dont un audit d'accessibilité axe en thème sombre et clair). Lighthouse mobile : Performance 100, Accessibilité 100, Bonnes pratiques 100. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
 
 ---
 
@@ -72,6 +72,19 @@ Les 6 phases de départ sont terminées. Deuxième série en cours : course avan
 - Unités maison : tranche et quart de khobz, bol, cuillère, pièce, verre…
 - Les plats dont la recette varie sont marqués **« estimé »**. Toutes les valeurs sont modifiables.
 - Repas (petit-déjeuner, déjeuner, goûter, dîner, snacks), « Copier d'hier », recettes perso, **alerte allergies**, rapport sur 7 jours.
+- **Table CIQUAL 2020** (ANSES, Licence Ouverte) : 2 298 aliments avec une énergie officielle, cherchés en même temps que tes aliments. Le fichier (82 Ko compressé) est disponible hors-ligne. Un aliment CIQUAL n'est copié dans ta base que lorsque tu l'utilises : tes aliments marocains et tes valeurs modifiées ne sont jamais écrasés.
+- **Scanner de code-barres** (ZXing, fonctionne dans Safari iOS) avec recherche sur **Open Food Facts**. Si la caméra n'est pas disponible : photo du code ou saisie des chiffres. Les produits trouvés sont gardés sur le téléphone : un produit déjà scanné se retrouve hors-ligne.
+- **Micronutriments** : fibres, sucres, sel/sodium, graisses saturées, fer, calcium, potassium, vitamines D et B12, avec des repères selon ton profil (ANSES / EFSA, OMS pour le sel). L'app indique quelle part des aliments est renseignée : une valeur inconnue n'est jamais comptée comme 0.
+- **Favoris, récents, repas fréquents** (mêmes aliments notés au moins 2 fois) et **ajout rapide** en kcal/macros, marqué « estimation ».
+- **Recettes** : ingrédients en poids cru, poids cuit du plat fini, nombre de portions (unité « portion »).
+- **Menus de la semaine** et **liste de courses** générée automatiquement. Les recettes sont remplacées par leurs ingrédients crus. Budget estimé en dirhams, avec des prix indicatifs modifiables pour les aliments fournis.
+- **Cyclage des calories** (option) : plus les jours d'entraînement, moins les jours de repos, d'après ton planning réel. La moyenne de la semaine ne change pas, et l'objectif ne descend jamais sous le BMR.
+- **Mode Ramadan** (option) :
+  - repas renommés (s'hour, ftour) ;
+  - plan d'eau réparti entre ftour et s'hour ;
+  - créneaux d'entraînement conseillés ;
+  - déficit limité à 10 % de la dépense.
+- **Photo d'un plat analysée par IA** : seulement si une clé Gemini est configurée. Tu vérifies et corriges chaque ligne avant l'ajout, et le résultat est toujours marqué « estimation ».
 
 ### FitPilot Coach
 - Par défaut, **analyse par règles locale** : hors-ligne, sans clé, et clairement indiquée comme n'étant **pas une IA**. Elle couvre :
@@ -106,6 +119,10 @@ Les 6 phases de départ sont terminées. Deuxième série en cours : course avan
 - **Météo et altitude de secours** viennent d'Open-Meteo (gratuit, usage non commercial). Hors-ligne, elles sont récupérées plus tard, à l'ouverture de la course. La météo est celle d'une grille de modèle, pas d'une station au coin de la rue.
 - **Vibration** : Safari sur iPhone ne permet pas aux sites web de vibrer. La fin du repos est signalée par un son (mode silencieux désactivé).
 - **Valeurs nutritionnelles** : valeurs de référence arrondies (USDA FoodData Central, CIQUAL). Les plats traditionnels sont des estimations.
+- **CIQUAL** : le site de l'ANSES était en maintenance lors de la préparation. Le fichier officiel (XML du 07/07/2020) a été récupéré depuis sa copie archivée par la Wayback Machine, puis converti par `scripts/ciqual-convert.py`. 887 aliments n'ont pas de valeur énergétique officielle : ils sont écartés plutôt qu'estimés.
+- **Scanner** : la caméra dans une app installée sur l'écran d'accueil dépend de la version d'iOS, et elle n'a **pas pu être testée sur un vrai iPhone**. Le repli « photo du code » ou la saisie des chiffres fonctionne partout. Open Food Facts est une base collaborative : vérifie l'étiquette en cas de doute.
+- **Photo IA** : l'image part chez Google avec ta clé. L'estimation des quantités sur photo est approximative (±30 % ou plus).
+- **Prix** : indicatifs, modifiables. Ils varient selon la ville et la saison.
 - **Calories brûlées, 1RM, masse grasse et progrès** sont des **estimations**. FitPilot ne remplace pas un avis médical.
 - **Testé** avec les moteurs WebKit et Chromium de Playwright, au format iPhone 390×844, et avec un GPS simulé. **Pas encore testé sur un vrai iPhone** : fais un essai de course GPS courte et un essai de sauvegarde/restauration après l'installation.
 - Dans le WebKit de test sous Windows, la restauration d'une sauvegarde prend environ 5 s (environ 0,6 s dans Chromium). Un libellé « Restauration… » s'affiche pendant l'opération.

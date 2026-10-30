@@ -37,7 +37,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // data/*.json : table CIQUAL, disponible hors-ligne dès la première visite.
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}', 'data/*.json'],
         // Dépendances optionnelles de jsPDF (méthodes .html() et SVG, non utilisées) : hors du cache hors-ligne.
         globIgnores: ['**/html2canvas-*.js', '**/purify.es-*.js', '**/index.es-*.js'],
         navigateFallback: 'index.html',

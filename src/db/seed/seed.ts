@@ -43,8 +43,9 @@ async function seedFoodDetails(database: FitPilotDB) {
       const patch: Partial<Food> = {};
       const micros = SEED_MICROS[f.key!];
       if (micros) {
+        // Pas de ciqualCode ici : l'aliment fourni garde son identité (nom, macros) ; seuls les
+        // micronutriments viennent de l'équivalent CIQUAL (sinon la recherche CIQUAL le renverrait).
         for (const k of MICRO_KEYS) if (f[k] === undefined && micros[k] !== undefined) patch[k] = micros[k];
-        if (f.ciqualCode === undefined) patch.ciqualCode = micros.ciqual;
       }
       if (!f.price && DEFAULT_PRICES_MAD[f.key!]) patch.price = DEFAULT_PRICES_MAD[f.key!];
       if (Object.keys(patch).length) await database.foods.update(f.id!, patch);

@@ -14,6 +14,7 @@ import { fmt, t } from '@/i18n';
 import { BackupImport } from './BackupImport';
 import { CoachSettingsCard } from '../coach/CoachSettings';
 import { VoiceSettingsCard } from '../running/VoiceSettingsCard';
+import { NutritionSettingsCard } from '../nutrition/NutritionSettingsCard';
 
 const s = t.settings;
 
@@ -36,6 +37,7 @@ export function SettingsPage() {
         <StorageCard />
         {settings && <CoachSettingsCard settings={settings} />}
         <VoiceSettingsCard />
+        <NutritionSettingsCard />
         <Card>
           <CardTitle icon={<BellRing size={18} />}>{t.reminders.title}</CardTitle>
           <label className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-2">
