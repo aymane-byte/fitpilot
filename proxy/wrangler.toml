@@ -1,0 +1,7 @@
+name = "fitpilot-proxy"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Remplace par l'adresse exacte de ton app (sans / final).
+ALLOWED_ORIGIN = "https://ton-pseudo.github.io"

@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+
+/* Thèmes : data-theme sur <html>. --accent = remplissage (boutons), --accent-text = texte/icônes sur surface. */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --surface: #141416;
+  --surface-2: #1d1d21;
+  --border: #27272c;
+  --text: #f4f4f5;
+  --muted: #9b9ba5;
+  --accent: #c6ff3d;
+  --accent-ink: #0a0a0b;
+  --accent-text: #c6ff3d;
+  --accent-soft: rgb(198 255 61 / 0.12);
+  --danger: #ff6b6b;
+  --warning: #ffb547;
+  --info: #62b8ff;
+  --protein: #ff8a5c;
+  --carbs: #62b8ff;
+  --fat: #ffd65c;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f4f1;
+  --surface: #ffffff;
+  --surface-2: #ecece7;
+  --border: #dedfd8;
+  --text: #111113;
+  --muted: #55565e;
+  --accent: #c6ff3d;
+  --accent-ink: #0a0a0b;
+  --accent-text: #3a5f00;
+  --accent-soft: rgb(110 170 0 / 0.12);
+  --danger: #b02525;
+  --warning: #8a4f00;
+  --info: #1765ad;
+  --protein: #d9592b;
+  --carbs: #1f78c8;
+  --fat: #a67c00;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-protein: var(--protein);
+  --color-carbs: var(--carbs);
+  --color-fat: var(--fat);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --animate-rise: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-sheet: sheet 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-fade: fade 0.2s ease-out both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100dvh;
+  /* Empêche le zoom auto d'iOS sur les inputs < 16px. */
+  -webkit-text-size-adjust: 100%;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pl-safe { padding-left: env(safe-area-inset-left); }
+.pr-safe { padding-right: env(safe-area-inset-right); }
+
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
