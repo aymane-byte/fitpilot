@@ -7,7 +7,7 @@ Application fitness personnelle pour iPhone (PWA) : musculation, course, nutriti
 
 ## Où en est le projet ?
 
-Les 6 phases sont terminées.
+Les 6 phases de départ sont terminées. Deuxième série en cours : course avancée (A), nutrition complète (B), finitions (C).
 
 | Phase | Contenu | État |
 |---|---|---|
@@ -17,8 +17,11 @@ Les 6 phases sont terminées.
 | 4 | FitPilot Coach (règles locales, Gemini/Groq en option, proxy facultatif) | ✅ |
 | 5 | Mesures, photos avant/après, rapports, PDF, rappels, export Calendrier | ✅ |
 | 6 | Accessibilité (WCAG 2.1 AA), performance, passe de tests complète | ✅ |
+| A | Course « type Strava » : splits, meilleurs efforts, dénivelé, voix, séances guidées, cartes, charge, VDOT, chaussures, météo, partage, GPX/FIT, objectifs | ✅ |
+| B | Nutrition complète (code-barres, CIQUAL, micronutriments, menus, Ramadan…) | en cours |
+| C | Finitions (tableau de bord, coach, README, tests, déploiement) | à faire |
 
-**Vérifications automatiques** : 143 tests unitaires, 55 tests de bout en bout (iPhone WebKit + Chromium, dont un audit d'accessibilité axe en thème sombre et clair). Lighthouse mobile : Performance 100, Accessibilité 100, Bonnes pratiques 100. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
+**Vérifications automatiques** : 224 tests unitaires, 70 tests de bout en bout (iPhone WebKit + Chromium, dont un audit d'accessibilité axe en thème sombre et clair). Lighthouse mobile : Performance 100, Accessibilité 100, Bonnes pratiques 100. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
 
 ---
 
@@ -42,8 +45,22 @@ Les 6 phases sont terminées.
 - Historique, records, 1RM estimé (formule d'Epley), courbe de progression.
 
 ### Course
-- Saisie manuelle (allure, vitesse, calories estimées) ou **suivi GPS** avec carte OpenStreetMap. Les points GPS imprécis ou impossibles sont filtrés, et l'écran reste allumé quand l'iPhone le permet.
-- Records 1 km / 5 km / 10 km et plus longue sortie, courbe d'allure, calendrier, objectif hebdomadaire.
+- Saisie manuelle (allure, vitesse, calories estimées, chaussures, effort ressenti) ou **suivi GPS** avec carte OpenStreetMap. Les points GPS imprécis ou impossibles sont filtrés, et l'écran reste allumé quand l'iPhone le permet.
+- **Détail d'une course** :
+  - splits par km (temps, allure, D+ / D−) ;
+  - meilleurs efforts détectés sur le tracé (400 m, 1 km, 1 mile, 5 km, 10 km, semi) avec badge « Record » ;
+  - profil d'altitude et carte colorée selon l'allure ;
+  - météo au milieu de la course ;
+  - image de partage (feuille de partage iOS) et export GPX.
+- **Dénivelé** : altitude GPS lissée (filtre médian, moyenne glissante, hystérésis de 5 m). Si la course n'a pas d'altitude, elle est récupérée via l'API gratuite d'élévation **Open-Meteo**.
+- **Annonces vocales** en français à chaque km (temps, allure du km, allure moyenne), réglables dans Paramètres.
+- **Séances guidées** : fractionnés, tempo, allure cible, et séances perso. La voix annonce le début et la fin de chaque répétition, et dit « trop rapide » ou « trop lent » (au plus toutes les 30 s).
+- **Carte de chaleur** de toutes les courses (12 mois, 3 mois ou tout).
+- **Charge d'entraînement** : forme (CTL, 42 j), fatigue (ATL, 7 j), fraîcheur (TSB). Chaque course reçoit un score = durée × intensité² × 100, l'intensité venant de l'effort ressenti, sinon de l'allure par rapport au seuil, sinon du type de course. Le calcul est expliqué dans l'app.
+- **VDOT** (formule de Daniels) d'après le meilleur effort des 6 derniers mois, temps prédits 5 km / 10 km / semi / marathon et allures d'entraînement. Tout est marqué « estimation ».
+- **Chaussures** : km par paire (y compris les km d'avant), paire par défaut, alerte vers 600–800 km (seuil réglable).
+- **Import GPX** (Strava : « Exporter le GPX ») et **FIT** (montres) avec détection des doublons et des pauses. Lecture FIT par `fit-file-parser` (MIT). Le SDK officiel de Garmin n'est pas utilisé : sa licence interdit de le redistribuer dans une app publique.
+- Records, courbe d'allure, calendrier, **objectifs semaine / mois / année** avec progression, retard ou avance, et projection.
 - 5 programmes : Débutant 5 km, Intermédiaire 5 km, 10 km, Endurance, Perte de gras.
 
 ### Planning
@@ -84,6 +101,9 @@ Les 6 phases sont terminées.
 
 - **Pas de notifications push** : il faudrait un serveur. Les rappels s'affichent à l'ouverture de l'app. Pour des alertes à heure fixe, exporte ton planning vers Calendrier.
 - **GPS sur iPhone** : une app web ne suit pas la position quand l'écran est verrouillé ou l'app en arrière-plan. Garde FitPilot ouvert pendant la course. Une course interrompue est récupérée à la réouverture.
+- **Voix** : les annonces s'arrêtent aussi quand l'écran se verrouille, et la première lecture doit suivre un toucher (bouton Démarrer). Le WebKit de test n'a pas de synthèse vocale : la voix n'a été vérifiée qu'à travers le texte annoncé, **pas encore à l'oreille sur iPhone**.
+- **Impossible dans une PWA iOS** (non simulé) : Apple Santé (pas d'API web), ceinture cardio Bluetooth (pas de Web Bluetooth dans Safari), GPS écran verrouillé. L'intensité vient donc de l'effort ressenti ou de l'allure.
+- **Météo et altitude de secours** viennent d'Open-Meteo (gratuit, usage non commercial). Hors-ligne, elles sont récupérées plus tard, à l'ouverture de la course. La météo est celle d'une grille de modèle, pas d'une station au coin de la rue.
 - **Vibration** : Safari sur iPhone ne permet pas aux sites web de vibrer. La fin du repos est signalée par un son (mode silencieux désactivé).
 - **Valeurs nutritionnelles** : valeurs de référence arrondies (USDA FoodData Central, CIQUAL). Les plats traditionnels sont des estimations.
 - **Calories brûlées, 1RM, masse grasse et progrès** sont des **estimations**. FitPilot ne remplace pas un avis médical.

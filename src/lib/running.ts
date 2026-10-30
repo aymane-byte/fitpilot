@@ -61,8 +61,12 @@ export interface RunLike {
   bestEfforts?: Partial<Record<RecordDistance, number>>;
 }
 
-export type RecordDistance = '1k' | '5k' | '10k';
-export const RECORD_KM: Record<RecordDistance, number> = { '1k': 1, '5k': 5, '10k': 10 };
+export type RecordDistance = '400m' | '1k' | '1mi' | '5k' | '10k' | 'half';
+/** Distances des meilleurs efforts détectés automatiquement (km). */
+export const RECORD_KM: Record<RecordDistance, number> = { '400m': 0.4, '1k': 1, '1mi': 1.609344, '5k': 5, '10k': 10, half: 21.0975 };
+export const RECORD_KEYS = Object.keys(RECORD_KM) as RecordDistance[];
+/** Sous 1 km, déduire un « record » de l'allure moyenne d'une sortie longue n'a pas de sens : GPS uniquement. */
+const ESTIMATE_MIN_KM = 1;
 
 export interface RunRecord {
   sec: number;
@@ -85,7 +89,7 @@ export function runRecords(runs: RunLike[]): Partial<Record<RecordDistance, RunR
       const measured = r.bestEfforts?.[key];
       let candidate: RunRecord | undefined;
       if (measured) candidate = { sec: measured, runId: r.id, date: r.date, measured: true };
-      else if (r.distanceKm >= km && r.distanceKm > 0) candidate = { sec: Math.round((r.durationSec / r.distanceKm) * km), runId: r.id, date: r.date, measured: false };
+      else if (km >= ESTIMATE_MIN_KM && r.distanceKm >= km && r.distanceKm > 0) candidate = { sec: Math.round((r.durationSec / r.distanceKm) * km), runId: r.id, date: r.date, measured: false };
       if (candidate && (!out[key] || candidate.sec < out[key]!.sec)) out[key] = candidate;
     }
   }
@@ -94,4 +98,13 @@ export function runRecords(runs: RunLike[]): Partial<Record<RecordDistance, RunR
 
 export function sumDistance(runs: { distanceKm: number }[]): number {
   return Math.round(runs.reduce((s, r) => s + r.distanceKm, 0) * 100) / 100;
+}
+
+/** « 5:30 » → 330 s/km. Accepte de 2:00 à 15:00 /km ; sinon undefined. */
+export function parsePace(input: string): number | undefined {
+  const m = /^(\d{1,2})[:'.,h](\d{2})$/.exec(input.trim());
+  if (!m) return undefined;
+  const sec = Number(m[1]) * 60 + Number(m[2]);
+  if (Number(m[2]) >= 60 || sec < 120 || sec > 900) return undefined;
+  return sec;
 }

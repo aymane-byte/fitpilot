@@ -1,13 +1,18 @@
 import { db as defaultDb, getSettings, updateSettings, type FitPilotDB } from '../db';
+import type { Food } from '../types';
 import { SEED_EXERCISES } from './exercises';
 import { SEED_PLANS } from './programs';
 import { SEED_FOODS } from './foods';
+import { SEED_MICROS } from './foodMicros';
+import { DEFAULT_PRICES_MAD } from '@/lib/mealPlan';
+import { MICRO_KEYS } from '@/lib/micros';
 
 /**
  * Versions des données de départ. Chaque étape ne tourne qu'une fois :
- * 1 = exercices + programmes (phase 2), 2 = aliments (phase 3).
+ * 1 = exercices + programmes (phase 2), 2 = aliments (phase 3),
+ * 3 = micronutriments CIQUAL et prix indicatifs des aliments fournis (nutrition complète).
  */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 /**
  * Insère les exercices et programmes de base manquants (idempotent : basé sur les clés).
@@ -19,6 +24,7 @@ export async function ensureSeed(database: FitPilotDB = defaultDb): Promise<void
   if (done >= SEED_VERSION) return;
   if (done < 1) await seedTraining(database);
   if (done < 2) await seedFoods(database);
+  if (done < 3) await seedFoodDetails(database);
   await updateSettings({ seedVersion: SEED_VERSION }, database);
 }
 
@@ -26,6 +32,23 @@ async function seedFoods(database: FitPilotDB) {
   await database.transaction('rw', database.foods, async () => {
     const existing = new Set((await database.foods.toArray()).map((f) => f.key).filter(Boolean));
     await database.foods.bulkAdd(SEED_FOODS.filter((f) => !existing.has(f.key)).map((f) => ({ ...f, custom: false })));
+  });
+}
+
+/** Ajoute micronutriments et prix sans jamais écraser une valeur déjà présente (modifiée par l'utilisateur). */
+async function seedFoodDetails(database: FitPilotDB) {
+  await database.transaction('rw', database.foods, async () => {
+    const foods = await database.foods.filter((f) => !!f.key).toArray();
+    for (const f of foods) {
+      const patch: Partial<Food> = {};
+      const micros = SEED_MICROS[f.key!];
+      if (micros) {
+        for (const k of MICRO_KEYS) if (f[k] === undefined && micros[k] !== undefined) patch[k] = micros[k];
+        if (f.ciqualCode === undefined) patch.ciqualCode = micros.ciqual;
+      }
+      if (!f.price && DEFAULT_PRICES_MAD[f.key!]) patch.price = DEFAULT_PRICES_MAD[f.key!];
+      if (Object.keys(patch).length) await database.foods.update(f.id!, patch);
+    }
   });
 }
 

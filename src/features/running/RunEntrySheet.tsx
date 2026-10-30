@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sheet } from '@/components/Sheet';
 import { NumberField, TextArea, TextField } from '@/components/Field';
 import { Segmented } from '@/components/Segmented';
 import { Button } from '@/components/Button';
 import { useToast } from '@/components/Toast';
-import { useProfile, useWeightEntries, latestWeight } from '@/hooks/useData';
+import { useProfile, useSettings, useWeightEntries, latestWeight } from '@/hooks/useData';
 import { num, t } from '@/i18n';
 import { todayISO } from '@/lib/dates';
 import { fieldErrors } from '@/lib/schemas';
 import { formatPace, parseDuration, paceSecPerKm, runCaloriesEstimate, speedKmh } from '@/lib/running';
 import { RUN_TYPES, type RunTypeKey } from '@/lib/runTypes';
 import { runEntrySchema, saveRun } from './service';
+import { RpePicker, ShoeSelect } from './RunControls';
 
 const r = t.run;
 
@@ -24,13 +25,20 @@ export function RunEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
   const [duration, setDuration] = useState('');
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const settings = useSettings();
+  const [shoeId, setShoeId] = useState<number>();
+  const [rpe, setRpe] = useState<number>();
+  // Paire par défaut présélectionnée.
+  useEffect(() => {
+    if (settings?.defaultShoeId) setShoeId((v) => v ?? settings.defaultShoeId);
+  }, [settings?.defaultShoeId]);
 
   const durationSec = parseDuration(duration);
   const preview = distance && durationSec ? { pace: paceSecPerKm(distance, durationSec), speed: speedKmh(distance, durationSec) } : null;
   const weight = profile ? latestWeight(profile, weights) : undefined;
 
   async function save() {
-    const res = runEntrySchema.safeParse({ date, type, distanceKm: distance, durationSec, notes: notes.trim() || undefined });
+    const res = runEntrySchema.safeParse({ date, type, distanceKm: distance, durationSec, notes: notes.trim() || undefined, rpe, shoeId });
     if (!res.success) {
       setErrors(fieldErrors(res.error));
       return;
@@ -66,6 +74,8 @@ export function RunEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
         {preview && <p className="-mt-2 text-xs text-muted">* {r.caloriesEstimate}</p>}
+        <ShoeSelect value={shoeId} onChange={setShoeId} />
+        <RpePicker value={rpe} onChange={setRpe} />
         <TextArea label={r.notes} value={notes} onChange={setNotes} placeholder={r.notesPlaceholder} />
         <Button size="lg" block onClick={save}>
           {t.common.save}

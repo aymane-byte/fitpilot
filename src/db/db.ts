@@ -22,6 +22,9 @@ export class FitPilotDB extends Dexie {
   scheduledActivities!: EntityTable<T.ScheduledActivity, 'id'>;
   coachConversations!: EntityTable<T.CoachConversation, 'id'>;
   coachMessages!: EntityTable<T.CoachMessage, 'id'>;
+  shoes!: EntityTable<T.Shoe, 'id'>;
+  runWorkouts!: EntityTable<T.RunWorkout, 'id'>;
+  mealPlans!: EntityTable<T.MealPlanItem, 'id'>;
 
   constructor(name = 'fitpilot') {
     super(name);
@@ -59,6 +62,17 @@ export class FitPilotDB extends Dexie {
     // v3 (phase 3) : aliments par clé et repas.
     this.version(3).stores({
       foods: '++id, name, category, custom, key, recipeId',
+    });
+    // v4 (course avancée) : chaussures, séances guidées perso, courses par chaussure.
+    this.version(4).stores({
+      runs: '++id, date, type, shoeId',
+      shoes: '++id, retired',
+      runWorkouts: '++id, name',
+    });
+    // v5 (nutrition complète) : produits scannés par code-barres, planificateur de repas.
+    this.version(5).stores({
+      foods: '++id, name, category, custom, key, recipeId, barcode, ciqualCode',
+      mealPlans: '++id, date, [date+type]',
     });
   }
 }

@@ -99,3 +99,73 @@ export function BarTargetChart({ labels, values, target, format, ariaLabel, targ
     </div>
   );
 }
+
+export interface LineSeries {
+  label: string;
+  values: number[];
+  /** Nom d'une variable CSS (ex. '--info'). */
+  colorVar: string;
+  dashed?: boolean;
+  fill?: boolean;
+}
+
+/** Plusieurs courbes avec légende (ex. forme / fatigue / fraîcheur, profil d'altitude). */
+export function MultiLineChart({ labels, series, format, ariaLabel, height = 'h-52', legend = true }: { labels: string[]; series: LineSeries[]; format: (v: number) => string; ariaLabel: string; height?: string; legend?: boolean }) {
+  const c = useThemeColors();
+  const color = (v: string) => cssVar(v) || c.accent;
+  return (
+    <div>
+      <div className={height}>
+        <Line
+          aria-label={ariaLabel}
+          options={{
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: reduceMotion() ? false : { duration: 500 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              tooltip: {
+                backgroundColor: c.surface,
+                titleColor: c.text,
+                bodyColor: c.text,
+                borderColor: c.grid,
+                borderWidth: 1,
+                padding: 10,
+                callbacks: { label: (ctx) => `${ctx.dataset.label} : ${format(ctx.parsed.y ?? 0)}` },
+              },
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: c.muted, maxTicksLimit: 5, maxRotation: 0, font: { size: 11 } }, border: { display: false } },
+              y: { grid: { color: c.grid }, border: { display: false }, ticks: { color: c.muted, maxTicksLimit: 5, font: { size: 11 }, callback: (v) => format(Number(v)) } },
+            },
+          }}
+          data={{
+            labels,
+            datasets: series.map((s) => ({
+              label: s.label,
+              data: s.values,
+              borderColor: color(s.colorVar),
+              backgroundColor: s.fill ? `color-mix(in srgb, ${color(s.colorVar)} 18%, transparent)` : color(s.colorVar),
+              fill: s.fill ? 'origin' : false,
+              borderDash: s.dashed ? [5, 4] : undefined,
+              tension: 0.3,
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHitRadius: 10,
+            })),
+          }}
+        />
+      </div>
+      {legend && (
+        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          {series.map((s) => (
+            <li key={s.label} className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-4 rounded" style={{ background: `var(${s.colorVar})` }} />
+              {s.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

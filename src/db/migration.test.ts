@@ -17,11 +17,16 @@ describe('migration v1 → v2', () => {
     });
     await v1.table('bodyMeasurements').add({ date: '2026-10-30', weightKg: 78, createdAt: 1 });
     await v1.table('workoutSessions').add({ date: '2026-10-30', name: 'X', startedAt: 5, endedAt: 9 });
+    await v1.table('runs').add({ date: '2026-10-29', type: 'easy', distanceKm: 5, durationSec: 1800, source: 'manual', createdAt: 1 });
     v1.close();
 
     const v2 = new FitPilotDB(name);
     await v2.open();
-    expect(v2.verno).toBe(3);
+    expect(v2.verno).toBe(5);
+    // v4 : courses conservées, nouvelles tables vides, index shoeId utilisable.
+    expect(await v2.runs.count()).toBe(1);
+    expect(await v2.shoes.count()).toBe(0);
+    expect(await v2.runs.where('shoeId').equals(1).count()).toBe(0);
     expect(await v2.bodyMeasurements.count()).toBe(1);
     // Le nouvel index startedAt est utilisable sur les anciennes lignes.
     expect((await v2.workoutSessions.orderBy('startedAt').first())?.name).toBe('X');

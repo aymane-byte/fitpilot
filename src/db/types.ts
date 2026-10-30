@@ -4,6 +4,12 @@ import type { ISODate } from '@/lib/dates';
 
 export type { Profile } from '@/lib/schemas';
 import type { Category, Equipment } from './seed/exercises';
+import type { RecordDistance } from '@/lib/running';
+import type { RunWeather } from '@/lib/openMeteo';
+import type { VoicePrefs } from '@/lib/voice';
+import type { WorkoutBlock } from '@/lib/guided';
+import type { Micros } from '@/lib/micros';
+import type { RamadanSettings } from '@/lib/dayTargets';
 export type { Category, Equipment };
 
 export type ThemePref = 'dark' | 'light' | 'system';
@@ -31,6 +37,15 @@ export interface Settings {
   inAppReminders?: boolean;
   /** Version des données de départ (exercices, programmes) déjà insérées. */
   seedVersion?: number;
+  /** Annonces vocales pendant la course. */
+  voice?: VoicePrefs;
+  /** Paire de chaussures attribuée par défaut aux nouvelles courses. */
+  defaultShoeId?: number;
+  /** Calories différentes les jours d'entraînement et de repos (même moyenne sur la semaine). */
+  calorieCycling?: { enabled: boolean; pct: number };
+  ramadan?: RamadanSettings;
+  /** Liste de courses : aliments cochés, par semaine (lundi ISO). */
+  shoppingChecked?: Record<string, number[]>;
 }
 
 export interface Exercise {
@@ -103,11 +118,28 @@ export interface Run {
   distanceKm: number;
   durationSec: number;
   source: 'manual' | 'gps';
+  /** Nom (ex. celui d'une course importée de Strava). */
+  name?: string;
   notes?: string;
-  /** Meilleurs temps mesurés par GPS (s). */
-  bestEfforts?: Partial<Record<'1k' | '5k' | '10k', number>>;
+  /** Meilleurs temps détectés sur le tracé (s) : 400 m, 1 km, 1 mile, 5 km, 10 km, semi. */
+  bestEfforts?: Partial<Record<RecordDistance, number>>;
   scheduledId?: number;
   createdAt: number;
+  /** Heure de départ (ms), pour la météo et la détection des doublons à l'import. */
+  startedAt?: number;
+  shoeId?: number;
+  /** Effort ressenti 1–10 (sert au calcul de la charge d'entraînement). */
+  rpe?: number;
+  elevGainM?: number;
+  elevLossM?: number;
+  /** Origine de l'altitude : GPS / fichier importé, ou modèle de terrain Open-Meteo. */
+  elevSource?: 'gps' | 'dem';
+  weather?: RunWeather;
+  /** Version de l'analyse déjà calculée (recalcul automatique quand l'analyse évolue). */
+  analysisVersion?: number;
+  importedFrom?: 'gpx' | 'fit';
+  /** Séance guidée suivie. */
+  workoutName?: string;
 }
 
 export interface RunPoint {
@@ -118,9 +150,30 @@ export interface RunPoint {
   lng: number;
   accuracy: number;
   seg?: number;
+  /** Altitude (m). */
+  alt?: number;
 }
 
-export interface Food {
+export interface Shoe {
+  id?: number;
+  name: string;
+  /** Km déjà parcourus avant de suivre la paire dans l'app. */
+  startKm: number;
+  /** Seuil d'alerte de remplacement (km). */
+  alertKm: number;
+  retired: boolean;
+  createdAt: number;
+}
+
+export interface RunWorkout {
+  id?: number;
+  name: string;
+  runType: RunType;
+  blocks: WorkoutBlock[];
+  createdAt: number;
+}
+
+export interface Food extends Micros {
   id?: number;
   /** Clé stable des aliments fournis avec l'app. */
   key?: string;
@@ -138,14 +191,25 @@ export interface Food {
   custom: boolean;
   /** Aliment généré par une recette perso (valeurs recalculées quand la recette change). */
   recipeId?: number;
+  /** Code-barres (produit Open Food Facts gardé en cache local). */
+  barcode?: string;
+  brand?: string;
+  nutriscore?: string;
+  /** Code de l'aliment CIQUAL d'origine. */
+  ciqualCode?: number;
+  favorite?: boolean;
+  /** Prix (DH) pour `grams` grammes, pour le budget des courses. */
+  price?: { mad: number; grams: number };
 }
 
 export interface Recipe {
   id?: number;
   name: string;
   items: { foodId: number; grams: number }[];
-  /** Poids final cuit (g) ; sinon somme des ingrédients. */
+  /** Poids final cuit (g) ; sinon somme des ingrédients (crus). */
   cookedWeightG?: number;
+  /** Nombre de portions : ajoute l'unité « portion » à l'aliment de la recette. */
+  servings?: number;
   /** Aliment correspondant (pour l'ajouter à un repas comme n'importe quel aliment). */
   foodId?: number;
 }
@@ -158,7 +222,7 @@ export interface Meal {
   type: MealType;
 }
 
-export interface MealItem {
+export interface MealItem extends Micros {
   id?: number;
   mealId: number;
   foodId: number;
@@ -170,6 +234,20 @@ export interface MealItem {
   carbsG: number;
   fatG: number;
   /** Portion saisie, pour l'affichage (ex. 2 × « tranche de khobz »). */
+  unitLabel?: string;
+  qty?: number;
+  /** Valeurs estimées (ajout rapide, photo analysée par l'IA, plat traditionnel). */
+  estimated?: boolean;
+}
+
+/** Aliment prévu dans le planificateur de repas (copié dans le journal le jour venu). */
+export interface MealPlanItem {
+  id?: number;
+  date: ISODate;
+  type: MealType;
+  foodId: number;
+  grams: number;
+  name: string;
   unitLabel?: string;
   qty?: number;
 }

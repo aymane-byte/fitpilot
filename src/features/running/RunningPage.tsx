@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CalendarDays, ChevronLeft, ChevronRight, Flag, ListOrdered, MapPin, Plus, Target, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, CalendarDays, ChevronLeft, ChevronRight, FileUp, Flag, Footprints, ListOrdered, Map as MapIcon, MapPin, Plus, Target, Timer, TrendingUp, Trophy } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardTitle, Notice } from '@/components/Card';
 import { Button } from '@/components/Button';
@@ -14,15 +14,26 @@ import type { Run } from '@/db/types';
 import { useSettings } from '@/hooks/useData';
 import { fmt, num, t } from '@/i18n';
 import { addDays, formatDateFr, parseISODate, startOfWeek, toISODate, todayISO } from '@/lib/dates';
-import { formatDuration, formatPace, paceSecPerKm, runRecords, sumDistance, type RecordDistance } from '@/lib/running';
+import { formatDuration, formatPace, paceSecPerKm, RECORD_KEYS, runRecords, sumDistance } from '@/lib/running';
 import { planWeek, RUN_PLANS } from '@/lib/runPlans';
+import { GOAL_TYPES, goalProgress, shoeKm, shoeStatus, type GoalPeriod } from '@/lib/runGoals';
 import { RunEntrySheet } from './RunEntrySheet';
+import { ImportRunSheet } from './ImportRunSheet';
+import { ensureRunAnalysis } from './service';
+import { useRunInsights } from './useRunInsights';
+
+const x = t.runx;
 
 const r = t.run;
 
 export function RunningPage() {
   const runs = useLiveQuery(() => db.runs.orderBy('date').toArray());
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
+  // Courses enregistrées avec une ancienne analyse : recalcul (nouvelles distances de records, dénivelé).
+  useEffect(() => {
+    void ensureRunAnalysis();
+  }, []);
   if (!runs) return null;
   const today = todayISO();
   const monday = startOfWeek(today);
@@ -46,7 +57,10 @@ export function RunningPage() {
             <MapPin size={18} /> {r.gps}
           </Link>
         </div>
-        <GoalCard weekKm={sumDistance(week)} />
+        <ToolsGrid onImport={() => setImporting(true)} />
+        <ShoeAlerts />
+        <FormSummary />
+        <GoalsCard runs={runs} />
         <PlanCard />
         <RecordsCard runs={runs} />
         <PaceCard runs={runs} />
@@ -54,6 +68,7 @@ export function RunningPage() {
         <HistoryCard runs={runs} />
       </main>
       {adding && <RunEntrySheet open onClose={() => setAdding(false)} />}
+      {importing && <ImportRunSheet open onClose={() => setImporting(false)} />}
     </>
   );
 }
@@ -72,53 +87,165 @@ function Summary({ label, runs }: { label: string; runs: Run[] }) {
   );
 }
 
-function GoalCard({ weekKm }: { weekKm: number }) {
-  const toast = useToast();
-  const goal = useLiveQuery(async () => (await db.goals.where('type').equals('run_week_km').filter((g) => g.status === 'active').first()) ?? null);
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState<number>();
-  if (goal === undefined) return null;
+function ToolsGrid({ onImport }: { onImport: () => void }) {
+  const tile = 'flex min-h-20 flex-col items-start justify-center gap-1 rounded-2xl border border-line bg-surface p-3 active:bg-surface-2';
+  const items: [string, ReactNode, string, string][] = [
+    ['/course/forme', <Activity size={18} />, x.form, x.formHint],
+    ['/course/carte', <MapIcon size={18} />, x.map, x.mapHint],
+    ['/course/seances', <Timer size={18} />, x.workouts, x.workoutsHint],
+    ['/course/chaussures', <Footprints size={18} />, x.shoes, x.shoesHint],
+  ];
+  return (
+    <nav aria-label={x.tools} className="grid grid-cols-2 gap-2">
+      {items.map(([to, icon, label, hint]) => (
+        <Link key={to} to={to} className={tile}>
+          <span className="flex items-center gap-2 font-semibold">
+            <span className="text-accent-text">{icon}</span>
+            {label}
+          </span>
+          <span className="text-xs text-muted">{hint}</span>
+        </Link>
+      ))}
+      <button type="button" onClick={onImport} className="col-span-2 flex min-h-13 items-center gap-2 rounded-2xl border border-line bg-surface px-3 text-left active:bg-surface-2">
+        <span className="text-accent-text"><FileUp size={18} /></span>
+        <span className="font-semibold">{x.import}</span>
+        <span className="text-xs text-muted">· {x.importHint}</span>
+      </button>
+    </nav>
+  );
+}
 
-  async function save() {
-    if (!value || value <= 0 || value > 300) return;
+function ShoeAlerts() {
+  const data = useLiveQuery(async () => ({ shoes: await db.shoes.filter((s) => !s.retired).toArray(), runs: await db.runs.toArray() }));
+  if (!data) return null;
+  const worn = data.shoes.map((s) => ({ s, km: shoeKm(s, data.runs) })).filter(({ s, km }) => shoeStatus(km, s.alertKm) !== 'ok');
+  if (!worn.length) return null;
+  return (
+    <Link to="/course/chaussures" className="block">
+      <Notice tone="warning" icon={<Footprints size={16} />}>
+        {worn.map(({ s, km }) => fmt(x.shoeAlert, { name: s.name, km: num(km, 0) })).join(' ')}
+      </Notice>
+    </Link>
+  );
+}
+
+function FormSummary() {
+  const ins = useRunInsights();
+  if (!ins?.today) return null;
+  const d = ins.today;
+  const cells: [string, number][] = [[x.ctl, d.ctl], [x.atl, d.atl], [x.tsb, d.tsb]];
+  return (
+    <Link to="/course/forme" className="block">
+      <Card className="active:bg-surface-2">
+        <CardTitle icon={<Activity size={18} />} action={<ChevronRight size={18} className="text-muted" />}>
+          {x.loadTitle}
+        </CardTitle>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {cells.map(([label, v]) => (
+            <div key={label} className="rounded-2xl bg-surface-2 p-2.5">
+              <p className="text-[11px] text-muted">{label}</p>
+              <p className="num text-lg font-semibold">{num(v, 0)}</p>
+            </div>
+          ))}
+        </div>
+        {ins.zone && <p className="mt-2 text-sm text-muted">{x.zones[ins.zone]}</p>}
+        {ins.vdot && (
+          <p className="num mt-1 text-sm">
+            {x.vdot} : <span className="font-semibold">{num(ins.vdot.vdot)}</span>
+          </p>
+        )}
+      </Card>
+    </Link>
+  );
+}
+
+const PERIODS: GoalPeriod[] = ['week', 'month', 'year'];
+const GOAL_MAX: Record<GoalPeriod, number> = { week: 300, month: 1200, year: 10_000 };
+
+function GoalsCard({ runs }: { runs: Run[] }) {
+  const toast = useToast();
+  const goals = useLiveQuery(() => db.goals.where('status').equals('active').toArray());
+  const [editing, setEditing] = useState<GoalPeriod | null>(null);
+  const [value, setValue] = useState<number>();
+  if (!goals) return null;
+  const today = todayISO();
+  const goalOf = (p: GoalPeriod) => goals.find((g) => g.type === GOAL_TYPES[p]);
+
+  async function save(period: GoalPeriod, target: number | undefined) {
     await db.transaction('rw', db.goals, async () => {
-      await db.goals.where('type').equals('run_week_km').modify({ status: 'abandoned' });
-      await db.goals.add({ type: 'run_week_km', target: value, status: 'active' });
+      await db.goals.where('type').equals(GOAL_TYPES[period]).filter((g) => g.status === 'active').modify({ status: 'abandoned' });
+      if (target) await db.goals.add({ type: GOAL_TYPES[period], target, status: 'active' });
     });
     toast(r.goalSaved);
-    setEditing(false);
+    setEditing(null);
   }
 
-  const pct = goal ? Math.min(100, (weekKm / goal.target) * 100) : 0;
+  const active = PERIODS.filter((p) => goalOf(p));
   return (
     <Card>
-      <CardTitle
-        icon={<Target size={18} />}
-        action={
-          <Button size="sm" variant="secondary" onClick={() => { setValue(goal?.target); setEditing(true); }}>
-            {goal ? r.editGoal : r.setGoal}
+      <CardTitle icon={<Target size={18} />}>{x.goalsTitle}</CardTitle>
+      {active.length === 0 && <p className="mb-3 text-sm text-muted">{x.noGoals}</p>}
+      <div className="flex flex-col gap-3">
+        {active.map((p) => {
+          const g = goalProgress(p, goalOf(p)!.target, runs, today);
+          const progressText = fmt(r.goalProgress, { done: num(g.doneKm), target: num(g.target) });
+          return (
+            <button
+              key={p}
+              type="button"
+              data-testid={`goal-${p}`}
+              onClick={() => {
+                setValue(g.target);
+                setEditing(p);
+              }}
+              className="rounded-2xl bg-surface-2 p-3 text-left active:bg-line"
+            >
+              <span className="mb-1.5 flex items-baseline justify-between gap-2">
+                <span className="font-semibold">{x.periods[p]}</span>
+                <span className="num text-sm">{progressText}</span>
+              </span>
+              <span className="block h-2.5 overflow-hidden rounded-full bg-line">
+                <span className="block h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${g.pct}%` }} />
+              </span>
+              <span className="num mt-1.5 block text-xs text-muted">
+                <span className={g.status === 'behind' ? 'text-warning' : 'text-accent-text'}>{g.status === 'done' ? x.goalDone : g.status === 'ahead' ? x.goalAhead : x.goalBehind}</span>
+                {g.status !== 'done' && <> · {fmt(x.goalLeft, { km: num(g.remainingKm), days: g.daysLeft })}</>}
+              </span>
+              {g.status !== 'done' && <span className="num block text-xs text-muted">{fmt(x.goalExpected, { expected: num(g.expectedKm), projected: num(g.projectedKm) })}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {PERIODS.filter((p) => !goalOf(p)).map((p) => (
+          <Button
+            key={p}
+            size="sm"
+            variant="secondary"
+            icon={<Plus size={16} />}
+            onClick={() => {
+              setValue(undefined);
+              setEditing(p);
+            }}
+          >
+            {x.periods[p]}
           </Button>
-        }
-      >
-        {r.goals}
-      </CardTitle>
-      {goal ? (
-        <>
-          <p className="num mb-2 text-sm">{fmt(r.goalProgress, { done: num(weekKm), target: num(goal.target) })}</p>
-          <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        ))}
+      </div>
+      <Sheet open={editing !== null} onClose={() => setEditing(null)} title={editing ? `${x.goalsTitle} · ${x.periods[editing]}` : ''}>
+        {editing && (
+          <div className="flex flex-col gap-4">
+            <NumberField label={x.goalKm} unit="km" value={value} onChange={setValue} autoFocus />
+            <Button size="lg" block onClick={() => save(editing, value)} disabled={!value || value <= 0 || value > GOAL_MAX[editing]}>
+              {t.common.save}
+            </Button>
+            {goalOf(editing) && (
+              <Button size="lg" variant="secondary" block onClick={() => save(editing, undefined)}>
+                {x.goalRemove}
+              </Button>
+            )}
           </div>
-        </>
-      ) : (
-        <p className="text-sm text-muted">{r.noGoal}</p>
-      )}
-      <Sheet open={editing} onClose={() => setEditing(false)} title={r.goals}>
-        <div className="flex flex-col gap-4">
-          <NumberField label={r.goalKm} unit="km" value={value} onChange={setValue} autoFocus />
-          <Button size="lg" block onClick={save} disabled={!value || value <= 0 || value > 300}>
-            {t.common.save}
-          </Button>
-        </div>
+        )}
       </Sheet>
     </Card>
   );
@@ -192,7 +319,7 @@ function PlanCard() {
 
 function RecordsCard({ runs }: { runs: Run[] }) {
   const recs = useMemo(() => runRecords(runs), [runs]);
-  const rows: [RecordDistance, string][] = [['1k', r.best1k], ['5k', r.best5k], ['10k', r.best10k]];
+  const rows = RECORD_KEYS.map((k) => [k, x.records[k]] as const);
   return (
     <Card>
       <CardTitle icon={<Trophy size={18} />}>{r.records}</CardTitle>

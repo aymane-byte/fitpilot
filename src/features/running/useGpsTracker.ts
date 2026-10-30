@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { movingTime, rejectReason, totalDistance, type GeoPoint } from '@/lib/geo';
+import { movingTime, rejectReason, totalDistance } from '@/lib/geo';
+import type { TrackPoint } from '@/lib/runAnalysis';
 
 export type GpsStatus = 'idle' | 'running' | 'paused' | 'stopped';
 export type GpsError = 'denied' | 'unavailable' | null;
 
 interface Draft {
   status: GpsStatus;
-  points: GeoPoint[];
+  points: TrackPoint[];
   seg: number;
   activeMs: number;
   resumedAt: number | null;
@@ -68,7 +69,9 @@ export function useGpsTracker() {
       setError(null);
       const d = draftRef.current;
       if (d.status !== 'running') return;
-      const p: GeoPoint = { t: pos.timestamp || Date.now(), lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, seg: d.seg };
+      const alt = pos.coords.altitude;
+      // iOS fournit l'altitude GPS (souvent bruitée : elle est lissée à l'analyse).
+      const p: TrackPoint = { t: pos.timestamp || Date.now(), lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, seg: d.seg, ...(typeof alt === 'number' && Number.isFinite(alt) ? { alt } : {}) };
       const reason = rejectReason(d.points.at(-1), p);
       if (reason === 'jitter') return; // bruit à l'arrêt : ni gardé ni compté comme rejet
       update((x) => (reason ? { ...x, rejected: x.rejected + 1 } : { ...x, points: [...x.points, p] }));

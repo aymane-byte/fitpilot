@@ -13,6 +13,7 @@ import { useSettings } from '@/hooks/useData';
 import { fmt, t } from '@/i18n';
 import { BackupImport } from './BackupImport';
 import { CoachSettingsCard } from '../coach/CoachSettings';
+import { VoiceSettingsCard } from '../running/VoiceSettingsCard';
 
 const s = t.settings;
 
@@ -34,6 +35,7 @@ export function SettingsPage() {
         <BackupCard lastBackupAt={settings?.lastBackupAt} includePhotos={settings?.backupIncludesPhotos ?? false} />
         <StorageCard />
         {settings && <CoachSettingsCard settings={settings} />}
+        <VoiceSettingsCard />
         <Card>
           <CardTitle icon={<BellRing size={18} />}>{t.reminders.title}</CardTitle>
           <label className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-2">

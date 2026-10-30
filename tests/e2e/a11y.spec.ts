@@ -2,7 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { completeOnboarding } from './helpers';
 
-const PAGES = ['#/', '#/muscu', '#/muscu?tab=programs', '#/muscu?tab=library', '#/course', '#/nutrition', '#/nutrition?tab=foods', '#/coach', '#/plus', '#/planning', '#/progres', '#/rapports', '#/profil', '#/parametres', '#/installer'];
+const PAGES = ['#/', '#/muscu', '#/muscu?tab=programs', '#/muscu?tab=library', '#/course', '#/course/forme', '#/course/carte', '#/course/chaussures', '#/course/seances', '#/nutrition', '#/nutrition?tab=foods', '#/coach', '#/plus', '#/planning', '#/progres', '#/rapports', '#/profil', '#/parametres', '#/installer'];
 
 for (const theme of ['dark', 'light'] as const) {
   test(`accessibilité (axe, WCAG 2.1 AA) — thème ${theme}`, async ({ page }) => {

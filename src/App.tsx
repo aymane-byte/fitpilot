@@ -21,6 +21,10 @@ const ProgramEditorPage = lazy(() => import('@/features/workouts/ProgramEditorPa
 const ExerciseDetailPage = lazy(() => import('@/features/workouts/ExerciseDetailPage').then((m) => ({ default: m.ExerciseDetailPage })));
 const RunningPage = lazy(() => import('@/features/running/RunningPage').then((m) => ({ default: m.RunningPage })));
 const GpsRunPage = lazy(() => import('@/features/running/GpsRunPage').then((m) => ({ default: m.GpsRunPage })));
+const FormPage = lazy(() => import('@/features/running/FormPage').then((m) => ({ default: m.FormPage })));
+const HeatmapPage = lazy(() => import('@/features/running/HeatmapPage').then((m) => ({ default: m.HeatmapPage })));
+const ShoesPage = lazy(() => import('@/features/running/ShoesPage').then((m) => ({ default: m.ShoesPage })));
+const WorkoutsLibraryPage = lazy(() => import('@/features/running/WorkoutsLibraryPage').then((m) => ({ default: m.WorkoutsLibraryPage })));
 const RunDetailPage = lazy(() => import('@/features/running/RunDetailPage').then((m) => ({ default: m.RunDetailPage })));
 const NutritionPage = lazy(() => import('@/features/nutrition/NutritionPage').then((m) => ({ default: m.NutritionPage })));
 const CoachPage = lazy(() => import('@/features/coach/CoachPage').then((m) => ({ default: m.CoachPage })));
@@ -82,6 +86,10 @@ export function App() {
             <Route path="muscu/exercice/:id" element={<ExerciseDetailPage />} />
             <Route path="course" element={<RunningPage />} />
             <Route path="course/gps" element={<GpsRunPage />} />
+            <Route path="course/forme" element={<FormPage />} />
+            <Route path="course/carte" element={<HeatmapPage />} />
+            <Route path="course/chaussures" element={<ShoesPage />} />
+            <Route path="course/seances" element={<WorkoutsLibraryPage />} />
             <Route path="course/:id" element={<RunDetailPage />} />
             <Route path="planning" element={<PlanningPage />} />
             <Route path="progres" element={<ProgressPage />} />

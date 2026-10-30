@@ -20,3 +20,13 @@ export function LazyBarTargetChart(props: ComponentProps<typeof Bars>) {
     </Suspense>
   );
 }
+
+const Multi = lazy(() => import('./TrendChart').then((m) => ({ default: m.MultiLineChart })));
+
+export function LazyMultiLineChart(props: ComponentProps<typeof Multi>) {
+  return (
+    <Suspense fallback={<div className="h-52" />}>
+      <Multi {...props} />
+    </Suspense>
+  );
+}
