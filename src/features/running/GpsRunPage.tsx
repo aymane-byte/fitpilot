@@ -1,7 +1,9 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Lock, Pause, Play, Satellite, Square, Timer, TriangleAlert, Volume2, VolumeX } from 'lucide-react';
+import { Lock, Pause, Play, Satellite, Smartphone, Square, Timer, TriangleAlert, Volume2, VolumeX } from 'lucide-react';
+import { Toggle } from '@/components/Toggle';
+import { updateSettings } from '@/db/db';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, Notice } from '@/components/Card';
 import { Button } from '@/components/Button';
@@ -22,7 +24,7 @@ import { saveRun } from './service';
 import { useGpsTracker, useWakeLock } from './useGpsTracker';
 import { useRunInsights } from './useRunInsights';
 import { useRunVoice } from './useRunVoice';
-import { speechSupported, unlockSpeech, voicePrefs } from './speech';
+import { speak, speechSupported, unlockSpeech, voicePrefs } from './speech';
 import { customToDef, resolveWorkout } from './workouts';
 
 const RouteMap = lazy(() => import('./RouteMap'));
@@ -50,8 +52,8 @@ export function GpsRunPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [params] = useSearchParams();
-  const gps = useGpsTracker();
   const settings = useSettings();
+  const gps = useGpsTracker({ autoPause: settings?.autoPause !== false });
   const insights = useRunInsights();
   const customs = useLiveQuery(() => db.runWorkouts.toArray());
   const wake = useWakeLock(gps.status === 'running' || gps.status === 'paused');
@@ -61,7 +63,17 @@ export function GpsRunPage() {
   const runType: RunTypeKey = type ?? workout?.runType ?? 'easy';
   const [discarding, setDiscarding] = useState(false);
   const [picking, setPicking] = useState(false);
+  // Course interrompue retrouvée : on demande quoi faire (reprendre, enregistrer, supprimer).
+  const [recoverOpen, setRecoverOpen] = useState(gps.recovered && gps.status === 'paused');
   const prefs = useMemo(() => voicePrefs(settings?.voice), [settings?.voice]);
+
+  // Annonce vocale de la pause et de la reprise automatiques.
+  const wasAuto = useRef(gps.autoPaused);
+  useEffect(() => {
+    if (wasAuto.current === gps.autoPaused) return;
+    wasAuto.current = gps.autoPaused;
+    if (prefs.enabled && gps.status === 'running') speak(gps.autoPaused ? t.gpsx.autoPauseSpeech : t.gpsx.autoResumeSpeech);
+  }, [gps.autoPaused, gps.status, prefs.enabled]);
 
   const km = gps.distanceM / 1000;
   const avgPace = km > 0.05 ? paceSecPerKm(km, gps.elapsedSec) : 0;
@@ -109,8 +121,19 @@ export function GpsRunPage() {
             {gps.error === 'denied' ? gp.denied : gp.unavailable}
           </Notice>
         )}
-        {gps.recovered && gps.status === 'paused' && <Notice tone="warning">{gp.recovered}</Notice>}
         {gps.status === 'idle' && <Notice icon={<Lock size={16} />}>{gp.honest}</Notice>}
+        {(gps.status === 'running' || gps.status === 'paused') && (
+          <div role="note" className="flex items-center gap-2.5 rounded-2xl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm font-semibold text-warning" data-testid="keep-on">
+            <Smartphone size={18} className="shrink-0" />
+            {t.gpsx.keepOn}
+          </div>
+        )}
+
+        {gps.status === 'idle' && (
+          <Card className="!p-3.5">
+            <Toggle label={t.gpsx.autoPause} hint={t.gpsx.autoPauseHint} checked={settings?.autoPause !== false} onChange={(autoPause) => updateSettings({ autoPause })} />
+          </Card>
+        )}
 
         {gps.status === 'idle' && (
           <Card className="!p-3.5">
@@ -128,17 +151,35 @@ export function GpsRunPage() {
 
         {st && gps.status !== 'idle' && <StepCard steps={guide.steps} index={guide.engine.index} step={st.step} remaining={st.remaining} progress={st.progress} feedback={guide.feedback} />}
 
-        <Card className="!p-5 text-center">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">{t.run.distance}</p>
-          <p className="num text-6xl font-bold tracking-tight" data-testid="gps-distance">
-            {num(km, 2)}
-            <span className="ml-1 text-xl font-medium text-muted">km</span>
+        <Card className={`!p-5 text-center ${gps.autoPaused ? 'border-warning/50' : ''}`}>
+          {gps.autoPaused && (
+            <p className="mb-3 rounded-xl bg-warning/15 px-3 py-2 text-sm font-semibold text-warning" role="status" data-testid="auto-paused">
+              {t.gpsx.autoPaused} · <span className="font-normal">{t.gpsx.autoPausedHint}</span>
+            </p>
+          )}
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">{t.gpsx.time}</p>
+          <p className="num text-7xl font-bold leading-none tracking-tight" data-testid="gps-time">
+            {formatDuration(gps.elapsedSec)}
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <Metric label={t.run.durationLabel} value={formatDuration(gps.elapsedSec)} />
-            <Metric label={t.run.currentPace} value={formatPace(currentPace || avgPace)} />
-            <Metric label={t.run.avgPace} value={formatPace(avgPace)} />
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-surface-2 px-2 py-3">
+              <p className="text-xs text-muted">{t.run.distance}</p>
+              <p className="num text-4xl font-bold tracking-tight" data-testid="gps-distance">
+                {num(km, 2)}
+                <span className="ml-1 text-base font-medium text-muted">km</span>
+              </p>
+            </div>
+            <div className="rounded-2xl bg-surface-2 px-2 py-3">
+              <p className="text-xs text-muted">{t.run.currentPace}</p>
+              <p className="num text-4xl font-bold tracking-tight">
+                {gps.autoPaused ? '–:––' : formatPace(currentPace || avgPace)}
+                <span className="ml-1 text-base font-medium text-muted">/km</span>
+              </p>
+            </div>
           </div>
+          <p className="num mt-2 text-sm text-muted">
+            {t.run.avgPace} {formatPace(avgPace)} /km
+          </p>
           <p className={`mt-4 flex items-center justify-center gap-1.5 text-xs ${weak ? 'text-warning' : 'text-muted'}`}>
             <Satellite size={14} />
             {gps.accuracy === null ? gp.waiting : fmt(gp.accuracy, { m: gps.accuracy })}
@@ -157,8 +198,8 @@ export function GpsRunPage() {
         </p>
 
         {gps.points.length > 0 && (
-          <Suspense fallback={<div className="h-64 rounded-2xl bg-surface-2" />}>
-            <RouteMap points={gps.points} follow={gps.status === 'running'} />
+          <Suspense fallback={<div className="h-72 rounded-2xl bg-surface-2" />}>
+            <RouteMap points={gps.points} follow={gps.status === 'running'} className="h-72" />
           </Suspense>
         )}
 
@@ -170,26 +211,26 @@ export function GpsRunPage() {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/95 px-4 pt-3 backdrop-blur-xl pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-lg gap-2">
           {gps.status === 'idle' && (
-            <Button size="lg" block onClick={start} disabled={gps.error !== null} icon={<Play size={20} fill="currentColor" />}>
+            <Button size="lg" block className="min-h-16 text-lg" onClick={start} disabled={gps.error !== null} icon={<Play size={24} fill="currentColor" />}>
               {gp.start}
             </Button>
           )}
           {gps.status === 'running' && (
             <>
-              <Button size="lg" variant="secondary" className="flex-1" onClick={gps.pause} icon={<Pause size={20} />}>
+              <Button size="lg" variant="secondary" className="min-h-16 flex-1 text-lg" onClick={gps.pause} icon={<Pause size={24} />}>
                 {gp.pause}
               </Button>
-              <Button size="lg" variant="danger" className="flex-1" onClick={gps.stop} icon={<Square size={18} />}>
+              <Button size="lg" variant="danger" className="min-h-16 flex-1 text-lg" onClick={gps.stop} icon={<Square size={22} />}>
                 {gp.stop}
               </Button>
             </>
           )}
           {gps.status === 'paused' && (
             <>
-              <Button size="lg" className="flex-1" onClick={gps.resume} icon={<Play size={20} fill="currentColor" />}>
+              <Button size="lg" className="min-h-16 flex-1 text-lg" onClick={gps.resume} icon={<Play size={24} fill="currentColor" />}>
                 {gp.resume}
               </Button>
-              <Button size="lg" variant="danger" className="flex-1" onClick={gps.stop} icon={<Square size={18} />}>
+              <Button size="lg" variant="danger" className="min-h-16 flex-1 text-lg" onClick={gps.stop} icon={<Square size={22} />}>
                 {gp.stop}
               </Button>
             </>
@@ -206,6 +247,20 @@ export function GpsRunPage() {
           )}
         </div>
       </div>
+      <Sheet open={recoverOpen} onClose={() => setRecoverOpen(false)} title={t.gpsx.recoverTitle}>
+        <div className="flex flex-col gap-3">
+          <p className="text-muted">{fmt(t.gpsx.recoverText, { km: num(km, 2), time: formatDuration(gps.elapsedSec) })}</p>
+          <Button size="lg" block onClick={() => { unlockSpeech(); gps.resume(); setRecoverOpen(false); }} icon={<Play size={20} fill="currentColor" />}>
+            {t.gpsx.recoverResume}
+          </Button>
+          <Button size="lg" block variant="secondary" onClick={() => { gps.stop(); setRecoverOpen(false); }} icon={<Square size={18} />}>
+            {t.gpsx.recoverSave}
+          </Button>
+          <Button size="lg" block variant="danger" onClick={() => { setRecoverOpen(false); setDiscarding(true); }}>
+            {t.gpsx.recoverDiscard}
+          </Button>
+        </div>
+      </Sheet>
       <Sheet open={picking} onClose={() => setPicking(false)} title={x.guided}>
         <div className="flex flex-col gap-2">
           {[{ key: '', name: x.freeRun, description: '' }, ...builtinWorkouts(insights?.paces), ...(customs ?? []).map(customToDef)].map((w) => (
@@ -283,14 +338,5 @@ function StepCard({ steps, index, step, remaining, progress, feedback }: { steps
       )}
       {next && <p className="mt-2 text-xs text-muted">{fmt(x.next, { label: `${stepLabel(next)} · ${next.by === 'time' ? formatDuration(next.value) : spokenDistance(next.value)}` })}</p>}
     </Card>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-surface-2 px-2 py-2.5">
-      <p className="text-[11px] text-muted">{label}</p>
-      <p className="num text-lg font-semibold">{value}</p>
-    </div>
   );
 }

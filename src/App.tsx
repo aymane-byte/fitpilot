@@ -9,6 +9,7 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { MorePage } from '@/features/placeholder/MorePage';
 import { UpdatePrompt } from '@/features/settings/UpdatePrompt';
 import { RemindersOnOpen } from '@/features/reminders/RemindersOnOpen';
+import { DraftBanner } from '@/features/running/DraftBanner';
 
 // Pages secondaires chargées à la demande.
 const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })));
@@ -25,6 +26,9 @@ const FormPage = lazy(() => import('@/features/running/FormPage').then((m) => ({
 const HeatmapPage = lazy(() => import('@/features/running/HeatmapPage').then((m) => ({ default: m.HeatmapPage })));
 const ShoesPage = lazy(() => import('@/features/running/ShoesPage').then((m) => ({ default: m.ShoesPage })));
 const WorkoutsLibraryPage = lazy(() => import('@/features/running/WorkoutsLibraryPage').then((m) => ({ default: m.WorkoutsLibraryPage })));
+const ActivitiesPage = lazy(() => import('@/features/running/ActivitiesPage').then((m) => ({ default: m.ActivitiesPage })));
+const RoutesPage = lazy(() => import('@/features/running/RoutesPage').then((m) => ({ default: m.RoutesPage })));
+const RouteDetailPage = lazy(() => import('@/features/running/RoutesPage').then((m) => ({ default: m.RouteDetailPage })));
 const RunDetailPage = lazy(() => import('@/features/running/RunDetailPage').then((m) => ({ default: m.RunDetailPage })));
 const NutritionPage = lazy(() => import('@/features/nutrition/NutritionPage').then((m) => ({ default: m.NutritionPage })));
 const CoachPage = lazy(() => import('@/features/coach/CoachPage').then((m) => ({ default: m.CoachPage })));
@@ -51,6 +55,7 @@ function AppLayout() {
       {/* L'écran GPS a ses propres commandes en bas : pas de barre d'onglets pour éviter les erreurs de toucher. */}
       {!FOCUS_ROUTES.includes(pathname) && <BottomNav />}
       {!FOCUS_ROUTES.includes(pathname) && <RemindersOnOpen />}
+      <DraftBanner />
     </div>
   );
 }
@@ -90,6 +95,9 @@ export function App() {
             <Route path="course/carte" element={<HeatmapPage />} />
             <Route path="course/chaussures" element={<ShoesPage />} />
             <Route path="course/seances" element={<WorkoutsLibraryPage />} />
+            <Route path="course/activites" element={<ActivitiesPage />} />
+            <Route path="course/parcours" element={<RoutesPage />} />
+            <Route path="course/parcours/:id" element={<RouteDetailPage />} />
             <Route path="course/:id" element={<RunDetailPage />} />
             <Route path="planning" element={<PlanningPage />} />
             <Route path="progres" element={<ProgressPage />} />

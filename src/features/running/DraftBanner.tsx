@@ -1,0 +1,26 @@
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
+import { fmt, num, t } from '@/i18n';
+import { formatDuration } from '@/lib/running';
+import { draftSummary } from './useGpsTracker';
+
+/** Course GPS non terminée (app fermée en pleine course) : bannière pour la reprendre ou l'enregistrer. */
+export function DraftBanner() {
+  const { pathname } = useLocation();
+  const [summary, setSummary] = useState(draftSummary);
+  useEffect(() => setSummary(draftSummary()), [pathname]);
+  if (!summary || pathname === '/course/gps') return null;
+  return (
+    <Link
+      to="/course/gps"
+      data-testid="draft-banner"
+      className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-lg items-center gap-3 rounded-2xl bg-warning px-4 py-3 text-sm font-semibold text-bg shadow-lg"
+    >
+      <MapPin size={18} className="shrink-0" />
+      <span className="min-w-0 flex-1">
+        {fmt(t.gpsx.banner, { km: num(summary.distanceM / 1000, 2), time: formatDuration(summary.activeSec) })} <span className="underline underline-offset-2">{t.gpsx.bannerCta}</span>
+      </span>
+    </Link>
+  );
+}

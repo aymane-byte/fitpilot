@@ -25,6 +25,7 @@ export class FitPilotDB extends Dexie {
   shoes!: EntityTable<T.Shoe, 'id'>;
   runWorkouts!: EntityTable<T.RunWorkout, 'id'>;
   mealPlans!: EntityTable<T.MealPlanItem, 'id'>;
+  routes!: EntityTable<T.FavoriteRoute, 'id'>;
 
   constructor(name = 'fitpilot') {
     super(name);
@@ -73,6 +74,10 @@ export class FitPilotDB extends Dexie {
     this.version(5).stores({
       foods: '++id, name, category, custom, key, recipeId, barcode, ciqualCode',
       mealPlans: '++id, date, [date+type]',
+    });
+    // v6 (GPS avancé) : parcours favoris.
+    this.version(6).stores({
+      routes: '++id, name',
     });
   }
 }

@@ -1,13 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CloudSun, Download, Map as MapIcon, Medal, Mountain, Pencil, Share2, Timer, Trash2 } from 'lucide-react';
+import { CloudSun, Crop, Download, Map as MapIcon, Medal, Mountain, Pencil, Route, Share2, Star, Timer, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardTitle, Notice } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Sheet } from '@/components/Sheet';
 import { Segmented } from '@/components/Segmented';
-import { TextArea } from '@/components/Field';
+import { TextArea, TextField } from '@/components/Field';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { Toggle } from '@/components/Toggle';
 import { LazyMultiLineChart } from '@/components/LazyTrendChart';
@@ -24,7 +25,8 @@ import { formatDuration, formatPace, paceSecPerKm, runCaloriesEstimate, speedKmh
 import { heatAdvice, weatherLabel } from '@/lib/openMeteo';
 import { buildGpx } from '@/lib/gpx';
 import { RUN_TYPES } from '@/lib/runTypes';
-import { deleteRun, enrichRun, updateRun } from './service';
+import { cropRun, deleteRun, enrichRun, routeRuns, saveRouteFromRun, updateRun } from './service';
+import { cumulative } from '@/lib/runAnalysis';
 import { RpePicker, ShoeSelect } from './RunControls';
 import { PACE_COLORS } from './RouteMap';
 
@@ -43,6 +45,9 @@ export function RunDetailPage() {
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [colored, setColored] = useState(true);
+  const [cropping, setCropping] = useState(false);
+  const [routing, setRouting] = useState(false);
+  const routes = useLiveQuery(() => db.routes.toArray());
   const run = useLiveQuery(async () => (await db.runs.get(runId)) ?? null, [runId]);
   const points = useLiveQuery(() => db.runPoints.where('runId').equals(runId).sortBy('t'), [runId]);
   const allRuns = useLiveQuery(() => db.runs.toArray());
@@ -82,6 +87,8 @@ export function RunDetailPage() {
   const pace = paceSecPerKm(run.distanceKm, run.durationSec);
   const weight = profile ? latestWeight(profile, weights) : undefined;
   const ranks = allRuns ? rankEfforts(run, allRuns) : [];
+  // Parcours favoris suivis par cette course, avec son rang parmi les passages.
+  const onRoutes = routes && allRuns ? routes.map((rt) => ({ rt, list: routeRuns(rt, allRuns) })).filter(({ list }) => list.some((x) => x.id === run.id)) : [];
   const hasTrack = points.length > 1;
   const stats: [string, string][] = [
     [r.distance, `${num(run.distanceKm, 2)} km`],
@@ -129,7 +136,17 @@ export function RunDetailPage() {
           {run.rpe && <span>{x.rpe} : <span className="font-medium text-fg">{run.rpe}/10</span></span>}
           {run.workoutName && <span>{fmt(x.workoutDone, { name: run.workoutName })}</span>}
           {run.importedFrom && <span>{fmt(x.imported, { format: run.importedFrom.toUpperCase() })}</span>}
+          {run.cropped && <span>({t.gpsx.cropped})</span>}
         </div>
+        {onRoutes.map(({ rt, list }) => {
+          const rank = list.findIndex((v) => v.id === run.id) + 1;
+          return (
+            <Link key={rt.id} to={`/course/parcours/${rt.id}`} className="flex items-center gap-2 rounded-2xl bg-accent-soft px-3.5 py-2.5 text-sm font-medium text-accent-text" data-testid="route-rank">
+              <Route size={16} />
+              {fmt(t.gpsx.routeOnRoute, { name: rt.name, rank: rank === 1 ? t.gpsx.routeRankBest : fmt(t.gpsx.routeRank, { n: rank, total: list.length }) })}
+            </Link>
+          );
+        })}
 
         {hasTrack && <WeatherCard run={run} />}
 
@@ -216,6 +233,12 @@ export function RunDetailPage() {
             <Button variant="secondary" onClick={exportGpx} icon={<Download size={18} />}>
               {x.exportGpx}
             </Button>
+            <Button variant="secondary" onClick={() => setRouting(true)} icon={<Star size={18} />}>
+              {t.gpsx.saveRoute}
+            </Button>
+            <Button variant="secondary" onClick={() => setCropping(true)} icon={<Crop size={18} />}>
+              {t.gpsx.crop}
+            </Button>
           </div>
         )}
         <Button variant="danger" block onClick={() => setDeleting(true)} icon={<Trash2 size={18} />}>
@@ -224,6 +247,8 @@ export function RunDetailPage() {
       </main>
       {editing && <EditRunSheet run={run} onClose={() => setEditing(false)} />}
       {sharing && <ShareSheet run={run} points={points} onClose={() => setSharing(false)} />}
+      {cropping && <CropSheet run={run} points={points} onClose={() => setCropping(false)} />}
+      {routing && <RouteSheet run={run} onClose={() => setRouting(false)} />}
       <ConfirmSheet
         open={deleting}
         onClose={() => setDeleting(false)}
@@ -319,9 +344,11 @@ function EditRunSheet({ run, onClose }: { run: Run; onClose: () => void }) {
   const [shoeId, setShoeId] = useState(run.shoeId);
   const [rpe, setRpe] = useState(run.rpe);
   const [notes, setNotes] = useState(run.notes ?? '');
+  const [name, setName] = useState(run.name ?? '');
   return (
     <Sheet open onClose={onClose} title={t.common.edit}>
       <div className="flex flex-col gap-4">
+        <TextField label={t.gpsx.rename} value={name} onChange={setName} placeholder={t.gpsx.renamePlaceholder} maxLength={60} />
         <Segmented layout="grid" label={x.editType} value={type} onChange={setType} options={RUN_TYPES.map((v) => ({ value: v, label: r.types[v] }))} />
         <ShoeSelect value={shoeId} onChange={setShoeId} />
         <RpePicker value={rpe} onChange={setRpe} />
@@ -330,7 +357,7 @@ function EditRunSheet({ run, onClose }: { run: Run; onClose: () => void }) {
           size="lg"
           block
           onClick={async () => {
-            await updateRun(run.id!, { type, shoeId, rpe, notes: notes.trim() || undefined });
+            await updateRun(run.id!, { type, shoeId, rpe, notes: notes.trim() || undefined, name: name.trim() || undefined });
             toast(t.common.saved);
             onClose();
           }}
@@ -377,6 +404,83 @@ function ShareSheet({ run, points, onClose }: { run: Run; points: TrackPoint[]; 
           }}
         >
           {x.share}
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Recadrage : deux curseurs (début, fin) en distance, aperçu du résultat avant de valider. */
+function CropSheet({ run, points, onClose }: { run: Run; points: TrackPoint[]; onClose: () => void }) {
+  const toast = useToast();
+  const total = useMemo(() => cumulative(points).dist.at(-1) ?? 0, [points]);
+  const [start, setStart] = useState(0);
+  const [end, setEnd] = useState(Math.round(total));
+  const kept = useMemo(() => {
+    const { dist, time } = cumulative(points);
+    const idx = dist.map((d, i) => (d >= start && d <= end ? i : -1)).filter((i) => i >= 0);
+    if (idx.length < 2) return { m: 0, sec: 0 };
+    return { m: dist[idx.at(-1)!] - dist[idx[0]], sec: time[idx.at(-1)!] - time[idx[0]] };
+  }, [points, start, end]);
+  const ok = kept.m >= 100;
+  return (
+    <Sheet open onClose={onClose} title={t.gpsx.cropTitle}>
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted">{t.gpsx.cropText}</p>
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          <span className="num flex justify-between">
+            {t.gpsx.cropStart} <span className="text-muted">{num(start / 1000, 2)} km</span>
+          </span>
+          <input type="range" min={0} max={Math.round(total)} step={10} value={start} onChange={(e) => setStart(Math.min(Number(e.target.value), end - 10))} className="accent-[var(--accent-text)]" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          <span className="num flex justify-between">
+            {t.gpsx.cropEnd} <span className="text-muted">{num(end / 1000, 2)} km</span>
+          </span>
+          <input type="range" min={0} max={Math.round(total)} step={10} value={end} onChange={(e) => setEnd(Math.max(Number(e.target.value), start + 10))} className="accent-[var(--accent-text)]" />
+        </label>
+        <p className="num font-semibold" data-testid="crop-result">
+          {fmt(t.gpsx.cropResult, { km: num(kept.m / 1000, 2), time: formatDuration(kept.sec) })}
+        </p>
+        {!ok && <p className="text-sm text-danger">{t.gpsx.cropTooShort}</p>}
+        <Button
+          size="lg"
+          block
+          disabled={!ok || (start === 0 && end >= Math.round(total))}
+          onClick={async () => {
+            await cropRun(run.id!, start, end);
+            toast(t.gpsx.cropDone);
+            onClose();
+          }}
+        >
+          {t.gpsx.cropSave}
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
+function RouteSheet({ run, onClose }: { run: Run; onClose: () => void }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [name, setName] = useState(run.name ?? '');
+  return (
+    <Sheet open onClose={onClose} title={t.gpsx.saveRoute}>
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted">{t.gpsx.routesIntro}</p>
+        <TextField label={t.gpsx.routeName} value={name} onChange={setName} placeholder={t.gpsx.routeNamePlaceholder} maxLength={50} />
+        <Button
+          size="lg"
+          block
+          disabled={!name.trim()}
+          onClick={async () => {
+            const id = await saveRouteFromRun(run.id!, name);
+            toast(t.gpsx.routeSaved);
+            onClose();
+            navigate(`/course/parcours/${id}`);
+          }}
+        >
+          {t.common.save}
         </Button>
       </div>
     </Sheet>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Activity, CalendarDays, ChevronLeft, ChevronRight, FileUp, Flag, Footprints, ListOrdered, Map as MapIcon, MapPin, Plus, Target, Timer, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, CalendarDays, Route, ChevronLeft, ChevronRight, FileUp, Flag, Footprints, ListOrdered, Map as MapIcon, MapPin, Plus, Target, Timer, TrendingUp, Trophy } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardTitle, Notice } from '@/components/Card';
 import { Button } from '@/components/Button';
@@ -21,6 +21,7 @@ import { RunEntrySheet } from './RunEntrySheet';
 import { ImportRunSheet } from './ImportRunSheet';
 import { ensureRunAnalysis } from './service';
 import { useRunInsights } from './useRunInsights';
+import { RunRow } from './ActivitiesPage';
 
 const x = t.runx;
 
@@ -94,6 +95,8 @@ function ToolsGrid({ onImport }: { onImport: () => void }) {
     ['/course/carte', <MapIcon size={18} />, x.map, x.mapHint],
     ['/course/seances', <Timer size={18} />, x.workouts, x.workoutsHint],
     ['/course/chaussures', <Footprints size={18} />, x.shoes, x.shoesHint],
+    ['/course/parcours', <Route size={18} />, t.gpsx.routes, t.gpsx.routesHint],
+    ['/course/activites', <ListOrdered size={18} />, t.gpsx.historyTitle, `${t.gpsx.period.week} · ${t.gpsx.period.month} · ${t.gpsx.period.year}`],
   ];
   return (
     <nav aria-label={x.tools} className="grid grid-cols-2 gap-2">
@@ -423,30 +426,27 @@ function CalendarCard({ runs }: { runs: Run[] }) {
 }
 
 function HistoryCard({ runs }: { runs: Run[] }) {
-  const list = [...runs].reverse().slice(0, 40);
+  const list = [...runs].sort((a, b) => b.date.localeCompare(a.date) || (b.startedAt ?? b.createdAt) - (a.startedAt ?? a.createdAt)).slice(0, 5);
   return (
     <Card>
-      <CardTitle icon={<ListOrdered size={18} />}>{r.history}</CardTitle>
+      <CardTitle
+        icon={<ListOrdered size={18} />}
+        action={
+          runs.length > 0 && (
+            <Link to="/course/activites" className="text-sm font-semibold text-accent-text">
+              {t.gpsx.historyAll}
+            </Link>
+          )
+        }
+      >
+        {r.history}
+      </CardTitle>
       {list.length === 0 ? (
         <p className="text-sm text-muted">{r.noRuns}</p>
       ) : (
         <ul className="-mx-4 -mb-4 divide-y divide-line">
           {list.map((x) => (
-            <li key={x.id}>
-              <Link to={`/course/${x.id}`} className="flex min-h-16 items-center gap-3 px-4 py-2 active:bg-surface-2">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-text">{x.source === 'gps' ? <MapPin size={18} /> : <Flag size={18} />}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="num block font-medium">
-                    {num(x.distanceKm, 2)} km · {formatDuration(x.durationSec)}
-                  </span>
-                  <span className="block truncate text-xs text-muted">
-                    {formatDateFr(x.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {r.types[x.type]} · {formatPace(paceSecPerKm(x.distanceKm, x.durationSec))}
-                    {r.perKm}
-                  </span>
-                </span>
-                <ChevronRight size={18} className="text-muted" />
-              </Link>
-            </li>
+            <RunRow key={x.id} run={x} />
           ))}
         </ul>
       )}

@@ -2,11 +2,11 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { completeOnboarding } from './helpers';
 
-const PAGES = ['#/', '#/muscu', '#/muscu?tab=programs', '#/muscu?tab=library', '#/course', '#/course/forme', '#/course/carte', '#/course/chaussures', '#/course/seances', '#/nutrition', '#/nutrition?tab=foods', '#/nutrition?tab=plan', '#/nutrition?tab=recipes', '#/coach', '#/plus', '#/planning', '#/progres', '#/rapports', '#/profil', '#/parametres', '#/installer'];
+const PAGES = ['#/', '#/muscu', '#/muscu?tab=programs', '#/muscu?tab=library', '#/course', '#/course/forme', '#/course/carte', '#/course/chaussures', '#/course/seances', '#/course/activites', '#/course/parcours', '#/nutrition', '#/nutrition?tab=foods', '#/nutrition?tab=plan', '#/nutrition?tab=recipes', '#/coach', '#/plus', '#/planning', '#/progres', '#/rapports', '#/profil', '#/parametres', '#/installer'];
 
 for (const theme of ['dark', 'light'] as const) {
   test(`accessibilité (axe, WCAG 2.1 AA) — thème ${theme}`, async ({ page }) => {
-    test.setTimeout(150_000);
+    test.setTimeout(240_000);
     // Animations désactivées (préférence « réduire les animations », gérée par l'app) : axe ne doit
     // pas mesurer les contrastes pendant le fondu d'apparition des cartes.
     await page.emulateMedia({ reducedMotion: 'reduce' });

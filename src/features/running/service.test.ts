@@ -4,7 +4,9 @@ import { exportData } from '@/db/backup';
 import { buildGpx } from '@/lib/gpx';
 import { parsePace } from '@/lib/running';
 import { runInsights } from '@/lib/runInsights';
-import { ANALYSIS_VERSION, cleanImportedTrack, enrichRun, ensureRunAnalysis, readTrackFile, saveImportedRun, saveRun } from './service';
+import { ANALYSIS_VERSION, cleanImportedTrack, cropRun, enrichRun, ensureRunAnalysis, readTrackFile, routeRuns, saveImportedRun, saveRouteFromRun, saveRun } from './service';
+import { filterRuns } from './ActivitiesPage';
+import type { Run } from '@/db/types';
 import { resolveWorkout, targetKey } from './workouts';
 
 function line(n: number, speed = 3, dt = 2, t0 = Date.parse('2026-10-20T07:00:00Z'), alt?: (i: number) => number) {
@@ -122,7 +124,7 @@ describe('sauvegarde', () => {
     const backup = await exportData({ includePhotos: false });
     expect(backup.tables.shoes).toHaveLength(1);
     expect(backup.tables.runWorkouts).toHaveLength(1);
-    expect(backup.schemaVersion).toBe(5);
+    expect(backup.schemaVersion).toBe(6);
   });
 });
 
@@ -154,5 +156,43 @@ describe('séances et synthèse', () => {
     expect(ins.paces?.threshold).toBeGreaterThan(0);
     expect(ins.today?.date).toBe('2026-10-30');
     expect(ins.basis).toEqual({ rpe: 1, pace: 2, type: 0 });
+  });
+});
+
+describe('GPS avancé : mini-tracé, recadrage, parcours favoris, historique', () => {
+  it('le mini-tracé est enregistré avec la course', async () => {
+    const id = await saveRun({ date: '2026-10-20', type: 'easy', distanceKm: 2.4, durationSec: 800, source: 'gps' }, line(400));
+    const run = (await db.runs.get(id))!;
+    expect(run.preview!.length).toBeGreaterThanOrEqual(2);
+    expect(run.preview!.length).toBeLessThanOrEqual(80);
+  });
+  it('recadrage : points, distance, durée et records recalculés', async () => {
+    const id = await saveRun({ date: '2026-10-20', type: 'easy', distanceKm: 3, durationSec: 1000, source: 'gps' }, line(501));
+    await cropRun(id, 1000, 3000);
+    const run = (await db.runs.get(id))!;
+    expect(run.distanceKm).toBeGreaterThan(1.95);
+    expect(run.distanceKm).toBeLessThan(2.01);
+    expect(run.durationSec).toBeLessThan(680);
+    expect(run.cropped).toBe(true);
+    expect(await db.runPoints.where('runId').equals(id).count()).toBeLessThan(340);
+    await expect(cropRun(id, 0, 50)).rejects.toThrow();
+  });
+  it('parcours favori : même trajet retrouvé, classé par temps', async () => {
+    const a = await saveRun({ date: '2026-10-01', type: 'easy', distanceKm: 3, durationSec: 1000, source: 'gps' }, line(501));
+    const b = await saveRun({ date: '2026-10-08', type: 'easy', distanceKm: 3, durationSec: 900, source: 'gps' }, line(501, 3, 1.8)); // même trajet, plus vite
+    await saveRun({ date: '2026-10-09', type: 'easy', distanceKm: 1.5, durationSec: 500, source: 'gps' }, line(250));
+    const rid = await saveRouteFromRun(a, 'Corniche');
+    const route = (await db.routes.get(rid))!;
+    expect(route.name).toBe('Corniche');
+    expect(routeRuns(route, await db.runs.toArray()).map((r) => r.id)).toEqual([b, a]);
+  });
+  it('historique : filtres période / type et tris', () => {
+    const mk = (id: number, date: string, km: number, sec: number, type: Run['type'] = 'easy'): Run => ({ id, date, type, distanceKm: km, durationSec: sec, source: 'manual', createdAt: id });
+    const runs = [mk(1, '2026-10-26', 5, 1500), mk(2, '2026-10-28', 10, 3300, 'long'), mk(3, '2026-09-10', 8, 2200, 'tempo'), mk(4, '2025-12-01', 3, 1000)];
+    expect(filterRuns(runs, 'week', 'all', 'recent', '2026-10-30').map((r) => r.id)).toEqual([2, 1]);
+    expect(filterRuns(runs, 'year', 'all', 'distance', '2026-10-30').map((r) => r.id)).toEqual([2, 3, 1]);
+    expect(filterRuns(runs, 'all', 'tempo', 'recent', '2026-10-30').map((r) => r.id)).toEqual([3]);
+    expect(filterRuns(runs, 'all', 'all', 'pace', '2026-10-30')[0].id).toBe(3); // 4:35 /km
+    expect(filterRuns(runs, 'all', 'all', 'oldest', '2026-10-30')[0].id).toBe(4);
   });
 });

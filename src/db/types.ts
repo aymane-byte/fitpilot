@@ -44,6 +44,8 @@ export interface Settings {
   /** Calories différentes les jours d'entraînement et de repos (même moyenne sur la semaine). */
   calorieCycling?: { enabled: boolean; pct: number };
   ramadan?: RamadanSettings;
+  /** Pause et reprise automatiques pendant la course GPS (activé par défaut). */
+  autoPause?: boolean;
   /** Liste de courses : aliments cochés, par semaine (lundi ISO). */
   shoppingChecked?: Record<string, number[]>;
 }
@@ -140,6 +142,21 @@ export interface Run {
   importedFrom?: 'gpx' | 'fit';
   /** Séance guidée suivie. */
   workoutName?: string;
+  /** Tracé allégé (≤ 80 points [lat, lng]) pour l'historique et les parcours favoris. */
+  preview?: [number, number][];
+  /** Recadrée par l'utilisateur (début / fin retirés). */
+  cropped?: boolean;
+}
+
+/** Parcours favori : tracé de référence pour comparer ses temps sur le même trajet. */
+export interface FavoriteRoute {
+  id?: number;
+  name: string;
+  preview: [number, number][];
+  distanceM: number;
+  /** Course d'origine. */
+  runId?: number;
+  createdAt: number;
 }
 
 export interface RunPoint {

@@ -7,6 +7,8 @@ import { toISODate } from '@/lib/dates';
 import { GPS_FILTER, haversine, movingTime, totalDistance } from '@/lib/geo';
 import { altitudeCoverage } from '@/lib/elevation';
 import { autoPause, detectBestEfforts, trackElevation, type TrackPoint } from '@/lib/runAnalysis';
+import { cropTrack, matchesRoute, previewLength, trackPreview } from '@/lib/track';
+import type { FavoriteRoute } from '@/db/types';
 import { demSampleIndices, elevationUrls, interpolateAltitudes, pickWeather, weatherUrl } from '@/lib/openMeteo';
 import { TrackImportError, type ImportedTrack } from '@/lib/gpx';
 import { RUN_TYPES } from '@/lib/runTypes';
@@ -14,7 +16,7 @@ import { RUN_TYPES } from '@/lib/runTypes';
 /** Allure minimale crédible : 2:30 /km (plus rapide que le record du monde du 1 500 m). */
 const MIN_PACE_SEC = 150;
 /** Incrémenter quand l'analyse d'une course change : les anciennes courses sont recalculées. */
-export const ANALYSIS_VERSION = 2;
+export const ANALYSIS_VERSION = 3;
 
 export const runEntrySchema = z
   .object({
@@ -31,10 +33,13 @@ export const runEntrySchema = z
 export type RunEntry = z.infer<typeof runEntrySchema>;
 
 /** Résultats d'analyse calculés à partir des points (meilleurs efforts, dénivelé). */
-export function analyzePoints(points: TrackPoint[]): Pick<Run, 'bestEfforts' | 'elevGainM' | 'elevLossM' | 'elevSource' | 'analysisVersion'> {
-  const out: Pick<Run, 'bestEfforts' | 'elevGainM' | 'elevLossM' | 'elevSource' | 'analysisVersion'> = { analysisVersion: ANALYSIS_VERSION };
+type Analysis = Pick<Run, 'bestEfforts' | 'elevGainM' | 'elevLossM' | 'elevSource' | 'analysisVersion' | 'preview'>;
+
+export function analyzePoints(points: TrackPoint[]): Analysis {
+  const out: Analysis = { analysisVersion: ANALYSIS_VERSION };
   if (!points.length) return out;
   out.bestEfforts = detectBestEfforts(points);
+  out.preview = trackPreview(points);
   // Altitude GPS exploitable seulement si la majorité des points en ont une.
   if (altitudeCoverage(points.map((p) => p.alt)) >= 0.5) {
     const elev = trackElevation(points, 'gps');
@@ -78,6 +83,44 @@ export async function saveRun(
 
 export async function updateRun(runId: number, patch: Partial<Pick<Run, 'shoeId' | 'rpe' | 'notes' | 'type' | 'name'>>) {
   await db.runs.update(runId, patch);
+}
+
+/**
+ * Recadre une course GPS : retire le début et/ou la fin (ex. GPS oublié allumé dans le bus).
+ * Distance, durée, meilleurs efforts, dénivelé et tracé sont recalculés. Irréversible.
+ */
+export async function cropRun(runId: number, startM: number, endM: number): Promise<void> {
+  const pts = await runPoints(runId);
+  const res = cropTrack(pts, startM, endM);
+  if (res.points.length < 2 || res.distanceM < 100) throw new Error('crop');
+  const keep = new Set(res.points.map((p) => p.id));
+  const run = await db.runs.get(runId);
+  const analysis = analyzePoints(res.points);
+  await db.transaction('rw', db.runs, db.runPoints, async () => {
+    await db.runPoints.bulkDelete(pts.filter((p) => !keep.has(p.id)).map((p) => p.id!));
+    await db.runs.update(runId, {
+      ...analysis,
+      // Altitude du terrain : recalculée sur la portion gardée.
+      ...(run?.elevSource === 'dem' && !analysis.elevSource ? (() => { const e = trackElevation(res.points, 'dem'); return e ? { elevGainM: e.gain, elevLossM: e.loss, elevSource: 'dem' as const } : {}; })() : {}),
+      distanceKm: Math.round(res.distanceM / 10) / 100,
+      durationSec: Math.max(1, res.durationSec),
+      startedAt: res.points[0].t,
+      cropped: true,
+    });
+  });
+}
+
+/** Enregistre le tracé d'une course comme parcours favori. */
+export async function saveRouteFromRun(runId: number, name: string): Promise<number> {
+  const run = await db.runs.get(runId);
+  const preview = run?.preview?.length ? run.preview : trackPreview(await runPoints(runId));
+  if (preview.length < 2) throw new Error('route');
+  return (await db.routes.add({ name: name.trim().slice(0, 50), preview, distanceM: Math.round(previewLength(preview)), runId, createdAt: Date.now() })) as number;
+}
+
+/** Courses qui suivent un parcours favori, triées du plus rapide au plus lent. */
+export function routeRuns(route: FavoriteRoute, runs: Run[]): Run[] {
+  return runs.filter((r) => r.preview && matchesRoute(route.preview, r.preview, r.distanceKm * 1000)).sort((a, b) => a.durationSec - b.durationSec);
 }
 
 export async function deleteRun(runId: number) {

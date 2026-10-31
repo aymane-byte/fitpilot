@@ -91,7 +91,7 @@ test('course GPS simulée : départ, points, enregistrement', async ({ page, con
   expect(km).toBeLessThan(0.12);
   await page.getByRole('button', { name: 'Terminer' }).click();
   await page.getByRole('button', { name: 'Enregistrer la course' }).click();
-  await expect(page.getByText('Parcours')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Parcours' })).toBeVisible();
   await expect(page.locator('.leaflet-container')).toBeVisible();
 });
 
