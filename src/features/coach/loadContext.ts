@@ -4,7 +4,11 @@ import { buildContext, type CoachContext } from '@/lib/coach/context';
 import { DEFAULT_MODELS, geminiProvider, groqProvider, rulesProvider, type CoachProvider } from '@/lib/coach/providers';
 import { latestWeight, targetsFor } from '@/hooks/useData';
 import { lastNDays } from '@/lib/nutrition';
-import { daysNutrition } from '../nutrition/service';
+import { dayItems, daysNutrition, microsOfItems } from '../nutrition/service';
+import { runInsights } from '@/lib/runInsights';
+import { averageMicros, microTargets } from '@/lib/micros';
+import { shoeKm, shoeStatus } from '@/lib/runGoals';
+import type { CoachExtra } from '@/lib/coach/context';
 
 /** Rassemble les 28 derniers jours de données et construit le contexte du coach. */
 export async function loadCoachContext(today = todayISO()): Promise<CoachContext | null> {
@@ -30,17 +34,37 @@ export async function loadCoachContext(today = todayISO()): Promise<CoachContext
       legsHeavy: s.programId !== undefined ? programs.get(s.programId)?.legsHeavy : undefined,
     })),
   );
+  const targets = targetsFor(profile, current);
   return buildContext({
     today,
     profile,
     currentWeightKg: current,
-    targets: targetsFor(profile, current),
+    targets,
+    extra: await loadExtra(today, profile, targets),
     weights: weights.map((w) => ({ date: w.date, value: w.weightKg! })),
     nutrition,
     workouts,
     runs: runs.map((r) => ({ date: r.date, km: r.distanceKm, sec: r.durationSec, type: r.type })),
     scheduled,
   });
+}
+
+/** Charge (toutes les courses), micronutriments des 7 derniers jours terminés, Ramadan, chaussures. */
+async function loadExtra(today: string, profile: { gender: 'male' | 'female'; age: number }, targets: { calories: number; waterMl: number }): Promise<CoachExtra> {
+  const [allRuns, shoes, settings] = await Promise.all([db.runs.orderBy('date').toArray(), db.shoes.filter((s) => !s.retired).toArray(), getSettings()]);
+  const ins = runInsights(allRuns, today);
+  const days = await Promise.all(lastNDays(addDays(today, -1), 7).map(async (d) => Object.values(await dayItems(d)).flat()));
+  const logged = days.filter((items) => items.length);
+  return {
+    load: ins.today && ins.zone ? { ctl: ins.today.ctl, atl: ins.today.atl, tsb: ins.today.tsb, zone: ins.zone, ramp: ins.ramp } : null,
+    vdot: ins.vdot && ins.paces ? { value: ins.vdot.vdot, thresholdPace: ins.paces.threshold, easyPace: ins.paces.easy[1] } : null,
+    micros: logged.length ? { avg: averageMicros(logged.map((items) => microsOfItems(items))), targets: microTargets(profile, targets.calories), days: logged.length } : null,
+    ramadan: settings.ramadan?.enabled ? { suhoor: settings.ramadan.suhoor, iftar: settings.ramadan.iftar, waterMl: targets.waterMl } : null,
+    shoes: shoes.map((s) => {
+      const km = shoeKm(s, allRuns);
+      return { name: s.name, km, alertKm: s.alertKm, status: shoeStatus(km, s.alertKm) };
+    }),
+  };
 }
 
 export async function exerciseInfos() {

@@ -279,7 +279,7 @@ function SplitsCard({ splits, hasElev }: { splits: ReturnType<typeof detailedSpl
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-muted">
-            <th className="pb-2 font-medium">{x.splitsKm}</th>
+            <th className="pb-2 pr-3 font-medium">{x.splitsKm}</th>
             <th className="pb-2 font-medium">{x.splitsPace}</th>
             <th className="w-full pb-2" aria-hidden />
             <th className="pb-2 text-right font-medium">{x.splitsTime}</th>
@@ -293,7 +293,7 @@ function SplitsCard({ splits, hasElev }: { splits: ReturnType<typeof detailedSpl
             const w = s.partial ? 0 : 35 + (65 * (slowest - s.paceSec)) / span;
             return (
               <tr key={s.index} className="border-t border-line">
-                <td className="py-2 pr-2 text-muted">{s.partial ? num(s.distanceM / 1000, 2) : s.index}</td>
+                <td className="py-2 pr-3 text-muted">{s.partial ? num(s.distanceM / 1000, 2) : s.index}</td>
                 <td className="py-2 pr-2 font-semibold">{formatPace(s.paceSec)}</td>
                 <td className="py-2 pr-2">
                   {!s.partial && <span className="block h-2 rounded-full bg-accent-text/70" style={{ width: `${w}%` }} />}

@@ -53,7 +53,8 @@ export function detailedSplits(points: TrackPoint[], elevSource: 'gps' | 'dem' =
   };
   const splits: Split[] = [];
   const marks: number[] = [];
-  for (let k = 1000; k <= total; k += 1000) marks.push(k);
+  // Un reste de 990 m ou plus est un km complet (arrondis GPS : 4 998 m = 5 km).
+  for (let k = 1000; k <= total + 10; k += 1000) marks.push(Math.min(k, total));
   if (total - (marks.at(-1) ?? 0) >= 50) marks.push(total);
   let prevD = 0;
   let prevT = 0;
@@ -71,7 +72,7 @@ export function detailedSplits(points: TrackPoint[], elevSource: 'gps' | 'dem' =
     }
     const d = m - prevD;
     const sec = tAt - prevT;
-    splits.push({ index: splits.length + 1, distanceM: Math.round(d), sec: Math.round(sec), paceSec: d > 0 ? Math.round(sec / (d / 1000)) : 0, gainM: Math.round(gain), lossM: Math.round(loss), partial: d < 999 });
+    splits.push({ index: splits.length + 1, distanceM: Math.round(d), sec: Math.round(sec), paceSec: d > 0 ? Math.round(sec / (d / 1000)) : 0, gainM: Math.round(gain), lossM: Math.round(loss), partial: d < 990 });
     prevD = m;
     prevT = tAt;
   }

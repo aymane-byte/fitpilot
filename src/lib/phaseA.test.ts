@@ -80,6 +80,12 @@ describe('analyse de course', () => {
     expect(splits[0].gainM).toBeLessThan(110);
     expect(splits.reduce((s, x) => s + x.gainM, 0)).toBeCloseTo(trackElevation(pts)!.gain, -1);
   });
+  it('un reste de 990 m+ compte comme km complet (4 998 m = 5 splits pleins)', () => {
+    const splits = detailedSplits(line(834, 3, 2)); // 833 × 6 m = 4 998 m
+    expect(splits).toHaveLength(5);
+    expect(splits.every((s) => !s.partial)).toBe(true);
+    expect(splits[4].index).toBe(5);
+  });
   it('splits sans altitude : D+ = 0, pas d’erreur', () => {
     expect(detailedSplits(line(400)).every((s) => s.gainM === 0)).toBe(true);
     expect(trackElevation(line(10))).toBeNull();

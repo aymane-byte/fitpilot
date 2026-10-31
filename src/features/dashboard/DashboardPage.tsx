@@ -22,7 +22,7 @@ import { Card, CardTitle, Notice } from '@/components/Card';
 import { Button } from '@/components/Button';
 import { Segmented } from '@/components/Segmented';
 import { db } from '@/db/db';
-import { needsBackupReminder } from '@/db/backup';
+import { needsBackupReminder } from '@/db/backupReminder';
 import type { BodyMeasurement, Profile, ScheduledActivity } from '@/db/types';
 import { useProfile, useSettings, useTargets, useWeightEntries } from '@/hooks/useData';
 import { fmt, num, signed, t } from '@/i18n';
@@ -36,10 +36,15 @@ import { DaySummary } from '../nutrition/DaySummary';
 import { WaterTracker } from '../nutrition/WaterTracker';
 import { dayItems } from '../nutrition/service';
 import { nextAction, todayItems, type TodayKey } from './today';
-import { WeightSheet } from './WeightSheet';
+import { MicrosLine, RunInsightsCard } from './Widgets';
+import { RamadanCard } from '../nutrition/RamadanCard';
+import { useDayTargets } from '../nutrition/useDayTargets';
+
 
 // Chart.js est chargé à part pour accélérer le premier affichage.
 const WeightChart = lazy(() => import('./WeightChart').then((m) => ({ default: m.WeightChart })));
+// La feuille de pesée (validation zod) n'est chargée qu'à l'ouverture.
+const WeightSheet = lazy(() => import('./WeightSheet').then((m) => ({ default: m.WeightSheet })));
 
 const d = t.dashboard;
 
@@ -89,10 +94,16 @@ export function DashboardPage() {
           onWeigh={() => setWeightOpen(true)}
         />
         <WeightCard profile={profile} entries={entries} current={data.weight} onAdd={() => setWeightOpen(true)} />
-        <NutritionCard targets={data.targets} />
+        <RamadanCard settings={settings} waterMl={data.targets.waterMl} compact />
+        <NutritionCard targets={data.targets} profile={profile} />
+        <RunInsightsCard />
         <WeekCard />
       </main>
-      {weightOpen && <WeightSheet open onClose={() => setWeightOpen(false)} entries={entries} lastWeight={data.weight} />}
+      {weightOpen && (
+        <Suspense fallback={null}>
+          <WeightSheet open onClose={() => setWeightOpen(false)} entries={entries} lastWeight={data.weight} />
+        </Suspense>
+      )}
     </>
   );
 }
@@ -296,10 +307,14 @@ function Stat({ label, value, unit }: { label: string; value: string; unit?: str
   );
 }
 
-function NutritionCard({ targets }: { targets: Targets }) {
+function NutritionCard({ targets: base, profile }: { targets: Targets; profile: Profile }) {
   const today = todayISO();
   const items = useLiveQuery(async () => Object.values(await dayItems(today)).flat(), [today]);
+  const day = useDayTargets(today, profile, base);
   if (!items) return null;
+  // Objectif du jour (cyclage entraînement / repos, plafond Ramadan) : le même que dans le journal.
+  const targets: Targets = day ? { ...base, calories: day.calories, carbsG: day.carbsG } : base;
+  const delta = targets.calories - base.calories;
   return (
     <Card>
       <CardTitle
@@ -312,7 +327,13 @@ function NutritionCard({ targets }: { targets: Targets }) {
       >
         {d.nutritionTitle}
       </CardTitle>
+      {day && day.reasons.length > 0 && (
+        <p className="num -mt-1 mb-3 text-xs font-medium text-accent-text">
+          {day.reasons.map((r) => (r === 'training' ? fmt(t.nx.trainingDay, { d: delta }) : r === 'rest' ? fmt(t.nx.restDay, { d: -delta }) : t.nx.ramadanCap)).join(' · ')}
+        </p>
+      )}
       <DaySummary items={items} targets={targets} />
+      <MicrosLine items={items} profile={profile} kcal={targets.calories} />
       {items.length === 0 && <p className="mt-3 text-xs text-muted">{d.noMealsYet}</p>}
       <div className="mt-4 border-t border-line pt-4">
         <WaterTracker date={today} targetMl={targets.waterMl} />

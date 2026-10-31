@@ -7,7 +7,7 @@ Application fitness personnelle pour iPhone (PWA) : musculation, course, nutriti
 
 ## Où en est le projet ?
 
-Les 6 phases de départ sont terminées. Deuxième série en cours : course avancée (A), nutrition complète (B), finitions (C).
+Les 6 phases de départ et la deuxième série (A : course avancée, B : nutrition complète, C : finitions) sont terminées et en ligne.
 
 | Phase | Contenu | État |
 |---|---|---|
@@ -19,15 +19,18 @@ Les 6 phases de départ sont terminées. Deuxième série en cours : course avan
 | 6 | Accessibilité (WCAG 2.1 AA), performance, passe de tests complète | ✅ |
 | A | Course « type Strava » : splits, meilleurs efforts, dénivelé, voix, séances guidées, cartes, charge, VDOT, chaussures, météo, partage, GPX/FIT, objectifs | ✅ |
 | B | Nutrition complète : code-barres + Open Food Facts, CIQUAL, micronutriments, favoris, repas fréquents, ajout rapide, recettes en portions, menus + courses en DH, cyclage des calories, mode Ramadan, photo IA (option) | ✅ |
-| C | Finitions (tableau de bord, coach, README, tests, déploiement) | à faire |
+| C | Widgets du tableau de bord (charge, VDOT, objectifs, chaussures, micronutriments, Ramadan) et coach à règles enrichi | ✅ |
 
-**Vérifications automatiques** : 236 tests unitaires, 78 tests de bout en bout (iPhone WebKit + Chromium, dont un audit d'accessibilité axe en thème sombre et clair). Lighthouse mobile : Performance 100, Accessibilité 100, Bonnes pratiques 100. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
+**Vérifications automatiques** : 247 tests unitaires et 83 tests de bout en bout (iPhone WebKit + Chromium), dont un audit d'accessibilité axe en thème sombre et clair.
+
+**Lighthouse mobile** (médiane de 3 mesures sur cette machine) : Performance 92, Accessibilité 100, Bonnes pratiques 100. Dans les mêmes conditions, la version des phases 1–6 obtient 95 : les nouveautés coûtent environ 0,3 s au tout premier affichage. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
 
 ---
 
 ## Ce que fait l'app
 
 ### Accueil
+- Widgets : forme / fatigue / fraîcheur et VDOT, progression des objectifs de distance, alerte chaussures, fibres / sel / sucres du jour, carte Ramadan, objectif calorique du jour (cyclage).
 - Résumé du jour : pesée, séance prévue (avec un bouton Démarrer), repas, eau, sauvegarde, et la **prochaine étape recommandée**.
 - Poids actuel / cible, tendance sur 7 jours, graphique interactif (pesées, moyenne mobile 7 j, ligne de cible).
 - Calories et macros consommées par rapport aux objectifs, suivi de l'eau.
@@ -94,6 +97,13 @@ Les 6 phases de départ sont terminées. Deuxième série en cours : course avan
   - les conflits du planning et les incohérences entre ton objectif et tes données ;
   - l'explication des exercices et le bilan de la semaine.
 - En option, **Gemini** ou **Groq** avec ta clé gratuite. L'app envoie seulement un résumé compact (profil + 14 derniers jours). Délai maximal, limitation de débit, affichage des tokens, et **repli automatique sur les règles** en cas d'erreur, de quota atteint ou d'absence d'internet.
+- Le coach à règles utilise aussi :
+  - la charge d'entraînement (surcharge, rampe trop rapide, fraîcheur) et le VDOT ;
+  - les micronutriments des 7 derniers jours (fibres, sel, sucres, fer, calcium), avec des aliments marocains suggérés, mais seulement si assez d'aliments sont renseignés ;
+  - le mode Ramadan (eau entre ftour et s'hour, placement de l'entraînement) ;
+  - l'usure des chaussures.
+
+  Ces données sont aussi ajoutées au résumé compact envoyé à Gemini ou Groq.
 - Règles de sécurité : pas de diagnostic ni de médicament, jamais sous le BMR, pas de surentraînement, respect des allergies et blessures, conseil de voir un médecin quand c'est pertinent.
 
 ### Progrès et rapports

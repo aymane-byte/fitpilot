@@ -42,13 +42,8 @@ export const weightEntrySchema = z.object({
   weightKg: z.number().min(30, t.errors.weightRange).max(300, t.errors.weightRange),
 });
 
-/** Convertit une saisie texte (virgule ou point) en nombre, ou undefined si vide/invalide. */
-export function parseDecimal(input: string): number | undefined {
-  const s = input.trim().replace(',', '.');
-  if (s === '') return undefined;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : undefined;
-}
+// Sans dépendance à zod (utilisé par les champs de saisie dès le premier écran).
+export { parseDecimal } from './decimal';
 
 /** Premier message d'erreur par champ, pour affichage sous les inputs. */
 export function fieldErrors(error: z.ZodError): Record<string, string> {

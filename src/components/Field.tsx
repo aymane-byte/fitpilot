@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
-import { parseDecimal } from '@/lib/schemas';
+import { parseDecimal } from '@/lib/decimal';
 
 const inputCls =
   'w-full min-h-12 rounded-2xl bg-surface-2 border border-line px-4 text-fg placeholder:text-muted/70 outline-none focus:border-accent-text transition';

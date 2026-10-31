@@ -4,6 +4,19 @@ import type { Goal, Targets } from '../energy';
 import { findConflicts, type PlanActivity } from '../planning';
 import { weeklyTrend, type WeeklyTrend } from '../stats';
 import { nutritionReport, type DayNutrition, type NutritionReport } from '../nutrition';
+import type { FormZone } from '../load';
+import type { MicroKey, MicroTarget, MicroTotal } from '../micros';
+import type { ShoeStatus } from '../runGoals';
+
+/** Données complémentaires (course avancée, micronutriments, Ramadan, chaussures). Toutes facultatives. */
+export interface CoachExtra {
+  load?: { ctl: number; atl: number; tsb: number; zone: FormZone; ramp: number | null } | null;
+  vdot?: { value: number; thresholdPace: number; easyPace: number } | null;
+  /** Moyenne des 7 derniers jours renseignés, avec les repères du profil. */
+  micros?: { avg: Partial<Record<MicroKey, MicroTotal>>; targets: Partial<Record<MicroKey, MicroTarget>>; days: number } | null;
+  ramadan?: { suhoor: string; iftar: string; waterMl: number } | null;
+  shoes?: { name: string; km: number; alertKm: number; status: ShoeStatus }[];
+}
 
 export interface CoachRawData {
   today: ISODate;
@@ -30,6 +43,7 @@ export interface CoachRawData {
   workouts: { date: ISODate; name: string; sets: number; legsHeavy?: boolean }[];
   runs: { date: ISODate; km: number; sec: number; type: string }[];
   scheduled: PlanActivity[]; // semaine en cours et suivante
+  extra?: CoachExtra;
 }
 
 export interface DayLine {
@@ -127,6 +141,13 @@ export function compactSummary(ctx: CoachContext): string {
     nutrition7j: { joursNotes: ctx.nutrition7.daysLogged, kcalMoy: ctx.nutrition7.avg.kcal, protMoy: ctx.nutrition7.avg.proteinG },
     entrainement7j: { seancesMuscu: ctx.workouts7, courses: ctx.runs7, km: ctx.runs7Km, joursConsecutifs: ctx.consecutiveTrainingDays },
     prevu7j: ctx.plannedNext7.map((a) => `${a.date} ${a.kind}:${a.title}${a.legsHeavy ? '(jambes)' : ''}`),
+    chargeCourse: ctx.raw.extra?.load ? { forme: ctx.raw.extra.load.ctl, fatigue: ctx.raw.extra.load.atl, fraicheur: ctx.raw.extra.load.tsb, rampe7j: ctx.raw.extra.load.ramp } : undefined,
+    vdotEstime: ctx.raw.extra?.vdot?.value,
+    micros7j: ctx.raw.extra?.micros?.days
+      ? Object.fromEntries(Object.entries(ctx.raw.extra.micros.avg).map(([k, v]) => [k, { moy: v!.value, renseigne: v!.coverage }]))
+      : undefined,
+    ramadan: ctx.raw.extra?.ramadan ?? undefined,
+    chaussuresUsees: ctx.raw.extra?.shoes?.filter((s) => s.status !== 'ok').map((s) => `${s.name} ${s.km}/${s.alertKm} km`),
     jours: ctx.days,
   });
 }

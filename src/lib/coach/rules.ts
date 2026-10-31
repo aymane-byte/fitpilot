@@ -4,6 +4,8 @@ import { fmt, num, signed, t } from '@/i18n';
 import { addDays, formatDateFr } from '../dates';
 import { bmi, type Goal } from '../energy';
 import { normalizeText } from '../text';
+import { formatPace } from '../running';
+import { microStatus } from '../micros';
 import type { CoachContext } from './context';
 
 const R = t.rules;
@@ -150,6 +152,57 @@ function trendText(ctx: CoachContext): string {
   return fmt(R.trendLine, { avg: num(ctx.trend.currentAvg), change: signed(ctx.trend.changeKg, 2), pct: signed(ctx.trend.changePct ?? 0, 2) });
 }
 
+// --- Course avancée, micronutriments, Ramadan, chaussures -----------------------
+
+export function loadInsights(ctx: CoachContext): Insight[] {
+  const load = ctx.raw.extra?.load;
+  if (load === undefined) return [];
+  if (!load) return [{ id: 'load', level: 'info', text: R.loadNone }];
+  const vars = { tsb: signed(load.tsb, 0), ctl: num(load.ctl, 0), atl: num(load.atl, 0) };
+  const text = { overload: R.loadOverload, optimal: R.loadOptimal, fresh: R.loadFresh, neutral: R.loadNeutral, transition: R.loadTransition }[load.zone];
+  const out: Insight[] = [{ id: 'load', level: load.zone === 'overload' ? 'warn' : load.zone === 'fresh' ? 'good' : 'info', text: fmt(text, vars) }];
+  if (load.ramp !== null && load.ramp > 8) out.push({ id: 'ramp', level: 'warn', text: fmt(R.loadRamp, { v: num(load.ramp) }) });
+  return out;
+}
+
+export function microInsights(ctx: CoachContext): Insight[] {
+  const m = ctx.raw.extra?.micros;
+  if (!m || !m.days) return [];
+  const out: Insight[] = [];
+  const st = (k: keyof typeof m.avg) => (m.avg[k] && m.targets[k] ? microStatus(m.avg[k]!, m.targets[k]!) : 'unknown');
+  const v = (k: keyof typeof m.avg, d = 0) => num(m.avg[k]?.value ?? 0, d);
+  if (st('fiberG') === 'low') out.push({ id: 'fiber', level: 'warn', text: fmt(R.fiberLow, { v: v('fiberG') }) });
+  if (st('saltG') === 'high') out.push({ id: 'salt', level: 'warn', text: fmt(R.saltHigh, { v: v('saltG', 1) }) });
+  if (st('sugarsG') === 'high') out.push({ id: 'sugar', level: 'info', text: fmt(R.sugarHigh, { v: v('sugarsG') }) });
+  if (st('ironMg') === 'low') out.push({ id: 'iron', level: 'info', text: fmt(R.ironLow, { v: v('ironMg', 1), t: m.targets.ironMg!.value }) });
+  if (st('calciumMg') === 'low') out.push({ id: 'calcium', level: 'info', text: fmt(R.calciumLow, { v: v('calciumMg'), t: m.targets.calciumMg!.value }) });
+  if (!out.length) {
+    const known = st('fiberG') !== 'unknown' && st('saltG') !== 'unknown';
+    out.push({ id: 'micros', level: known ? 'good' : 'info', text: known ? R.microsOk : R.microsUnknown });
+  }
+  return out;
+}
+
+export function ramadanInsights(ctx: CoachContext): Insight[] {
+  const r = ctx.raw.extra?.ramadan;
+  if (!r) return [];
+  return [
+    { id: 'ramadan', level: 'info', text: fmt(R.ramadanLine, { ml: r.waterMl, iftar: r.iftar, suhoor: r.suhoor }) },
+    { id: 'ramadan-training', level: 'info', text: R.ramadanTraining },
+  ];
+}
+
+export function shoeInsights(ctx: CoachContext): Insight[] {
+  return (ctx.raw.extra?.shoes ?? [])
+    .filter((s) => s.status !== 'ok')
+    .map((s) => ({ id: `shoe-${s.name}`, level: s.status === 'replace' ? ('warn' as const) : ('info' as const), text: fmt(s.status === 'replace' ? R.shoeReplace : R.shoeSoon, { name: s.name, km: num(s.km, 0), alert: s.alertKm }) }));
+}
+
+function vdotText(ctx: CoachContext): string | null {
+  const v = ctx.raw.extra?.vdot;
+  return v ? fmt(R.vdotLine, { v: num(v.value), t: formatPace(v.thresholdPace), e: formatPace(v.easyPace) }) : null;
+}
+
 /** Insights affichés en tête du coach (analyse de la semaine). */
 export function weeklyInsights(ctx: CoachContext): Insight[] {
   const out: Insight[] = [
@@ -158,8 +211,12 @@ export function weeklyInsights(ctx: CoachContext): Insight[] {
     proteinInsight(ctx),
     trainingInsight(ctx),
     recoveryInsight(ctx),
+    ...loadInsights(ctx),
+    ...shoeInsights(ctx),
     ...conflictInsights(ctx),
     ...inconsistencies(ctx),
+    ...microInsights(ctx),
+    ...ramadanInsights(ctx),
   ];
   if (ctx.raw.profile.injuries.trim()) out.push({ id: 'injury', level: 'info', text: fmt(R.injuryNote, { injury: ctx.raw.profile.injuries.trim().slice(0, 80) }) });
   return out;
@@ -195,11 +252,15 @@ export interface ExerciseInfo {
   mistakes: string;
 }
 
-type Intent = 'calories' | 'protein' | 'rest' | 'today' | 'run' | 'week' | 'greeting' | 'unknown';
+type Intent = 'calories' | 'protein' | 'micros' | 'ramadan' | 'shoes' | 'load' | 'rest' | 'today' | 'run' | 'week' | 'greeting' | 'unknown';
 
 const INTENTS: [Intent, RegExp][] = [
   ['calories', /calori|kcal|manger plus|manger moins|deficit|surplus|ajust/],
   ['protein', /prot(e|é)in|proteine/],
+  ['ramadan', /ramadan|ftour|f'tour|shour|s'hour|suhoor|iftar|jeune/],
+  ['micros', /fibre|sel\b|sodium|sucre|fer\b|calcium|vitamine|micronutri|potassium/],
+  ['shoes', /chaussure|basket|running shoe/],
+  ['load', /charge|forme\b|fraicheur|tsb|ctl|atl|vdot|surcharge/],
   ['rest', /repos|recup|fatigu|surentrain|courbatur/],
   ['today', /aujourd|ce soir|ce matin|que faire|quoi faire|seance du jour|prochaine seance/],
   ['run', /course|courir|footing|running|allure|km\b|10 ?k|5 ?k/],
@@ -239,12 +300,20 @@ export function rulesReply(message: string, ctx: CoachContext, exercises: Exerci
       return [trendText(ctx), calorieText(ctx)].join('\n');
     case 'protein':
       return proteinInsight(ctx).text;
+    case 'micros':
+      return microInsights(ctx).map((i) => i.text).join('\n') || R.microsUnknown;
+    case 'ramadan':
+      return ramadanInsights(ctx).map((i) => i.text).join('\n') || R.ramadanTraining;
+    case 'shoes':
+      return shoeInsights(ctx).map((i) => i.text).join('\n') || t.runx.noShoes;
+    case 'load':
+      return [...loadInsights(ctx).map((i) => i.text), vdotText(ctx)].filter(Boolean).join('\n') || R.loadNone;
     case 'rest':
-      return [recoveryInsight(ctx).text, ...conflictInsights(ctx).map((i) => i.text)].join('\n');
+      return [recoveryInsight(ctx).text, ...loadInsights(ctx).map((i) => i.text), ...conflictInsights(ctx).map((i) => i.text)].join('\n');
     case 'today':
       return todayText(ctx);
     case 'run':
-      return [runText(ctx), ...conflictInsights(ctx).map((i) => i.text)].join('\n');
+      return [runText(ctx), vdotText(ctx), ...loadInsights(ctx).map((i) => i.text), ...shoeInsights(ctx).map((i) => i.text), ...conflictInsights(ctx).map((i) => i.text)].filter(Boolean).join('\n');
     case 'greeting':
       return `${fmt(R.greeting, { name: ctx.raw.profile.name })}\n\n${weeklyReportText(ctx)}`;
     case 'week':
