@@ -21,7 +21,7 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 | B | Nutrition complète : code-barres + Open Food Facts, CIQUAL, micronutriments, favoris, repas fréquents, ajout rapide, recettes en portions, menus + courses en DH, cyclage des calories, mode Ramadan, photo IA (option) | ✅ |
 | C | Widgets du tableau de bord (charge, VDOT, objectifs, chaussures, micronutriments, Ramadan) et coach à règles enrichi | ✅ |
 
-**Vérifications automatiques** : 247 tests unitaires et 83 tests de bout en bout (iPhone WebKit + Chromium), dont un audit d'accessibilité axe en thème sombre et clair.
+**Vérifications automatiques** : 252 tests unitaires et 84 tests de bout en bout (iPhone WebKit + Chromium), dont un audit d'accessibilité axe en thème sombre et clair.
 
 **Lighthouse mobile** (médiane de 3 mesures sur cette machine) : Performance 92, Accessibilité 100, Bonnes pratiques 100. Dans les mêmes conditions, la version des phases 1–6 obtient 95 : les nouveautés coûtent environ 0,3 s au tout premier affichage. Le SEO est volontairement bas : l'app demande à ne pas être indexée.
 
@@ -33,7 +33,7 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 - Widgets : forme / fatigue / fraîcheur et VDOT, progression des objectifs de distance, alerte chaussures, fibres / sel / sucres du jour, carte Ramadan, objectif calorique du jour (cyclage).
 - Résumé du jour : pesée, séance prévue (avec un bouton Démarrer), repas, eau, sauvegarde, et la **prochaine étape recommandée**.
 - Poids actuel / cible, tendance sur 7 jours, graphique interactif (pesées, moyenne mobile 7 j, ligne de cible).
-- Calories et macros consommées par rapport aux objectifs, suivi de l'eau.
+- Calories et macros consommées par rapport aux objectifs, suivi de l'eau (+150 / +250 / +500 ml ou quantité libre de 20 à 2 000 ml).
 - Semaine en cours : séances faites / prévues, km de course, **série** de jours actifs, records.
 
 ### Profil et calculs
@@ -75,6 +75,7 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 - Unités maison : tranche et quart de khobz, bol, cuillère, pièce, verre…
 - Les plats dont la recette varie sont marqués **« estimé »**. Toutes les valeurs sont modifiables.
 - Repas (petit-déjeuner, déjeuner, goûter, dîner, snacks), « Copier d'hier », recettes perso, **alerte allergies**, rapport sur 7 jours.
+- **Recherche par mots** : ordre libre, sans accents ni pluriels, début de mot suffisant, « sans » = « non » (« thé sans sucre » trouve « Thé infusé, non sucré », jamais « Thé sucré »). Des résultats approchés s'affichent pour les requêtes de 3 mots ou plus.
 - **Table CIQUAL 2020** (ANSES, Licence Ouverte) : 2 298 aliments avec une énergie officielle, cherchés en même temps que tes aliments. Le fichier (82 Ko compressé) est disponible hors-ligne. Un aliment CIQUAL n'est copié dans ta base que lorsque tu l'utilises : tes aliments marocains et tes valeurs modifiées ne sont jamais écrasés.
 - **Scanner de code-barres** (ZXing, fonctionne dans Safari iOS) avec recherche sur **Open Food Facts**. Si la caméra n'est pas disponible : photo du code ou saisie des chiffres. Les produits trouvés sont gardés sur le téléphone : un produit déjà scanné se retrouve hors-ligne.
 - **Micronutriments** : fibres, sucres, sel/sodium, graisses saturées, fer, calcium, potassium, vitamines D et B12, avec des repères selon ton profil (ANSES / EFSA, OMS pour le sel). L'app indique quelle part des aliments est renseignée : une valeur inconnue n'est jamais comptée comme 0.

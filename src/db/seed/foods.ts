@@ -83,6 +83,9 @@ export const SEED_FOODS: SeedFood[] = [
   // Sucres et boissons
   { key: 'honey', name: 'Miel', category: 'sweet', kcal: 304, proteinG: 0.3, carbsG: 82.4, fatG: 0, estimated: false, source: usda, units: [u('cuillère à soupe', 21), u('cuillère à café', 7)] },
   { key: 'sugar', name: 'Sucre', category: 'sweet', kcal: 387, proteinG: 0, carbsG: 100, fatG: 0, estimated: false, source: usda, units: [u('morceau', 5), u('cuillère à café', 4)] },
+  { key: 'mint_tea_plain', name: 'Thé à la menthe sans sucre', category: 'drink', kcal: 1, proteinG: 0, carbsG: 0.2, fatG: 0, estimated: false, source: 'CIQUAL (thé infusé, non sucré)', units: [u('verre', 120), u('théière', 600)] },
+  { key: 'mint_tea_light', name: 'Thé à la menthe peu sucré', category: 'drink', kcal: 20, proteinG: 0, carbsG: 5, fatG: 0, estimated: true, source: 'Estimation (~5 g de sucre par 100 ml)', units: [u('verre', 120), u('théière', 600)] },
+  { key: 'coffee_black', name: 'Café noir sans sucre', category: 'drink', kcal: 2, proteinG: 0.1, carbsG: 0, fatG: 0, estimated: false, source: 'CIQUAL (café non sucré)', units: [u('tasse', 100), u('expresso', 40)] },
   { key: 'mint_tea', name: 'Thé à la menthe sucré', category: 'drink', kcal: 40, proteinG: 0, carbsG: 10, fatG: 0, estimated: true, source: 'Estimation (~10 g de sucre par 100 ml)', units: [u('verre', 120), u('théière', 600)] },
   { key: 'orange_juice', name: 'Jus d’orange', category: 'drink', kcal: 45, proteinG: 0.7, carbsG: 10.4, fatG: 0.2, estimated: false, source: usda, units: [u('verre', 250)] },
 

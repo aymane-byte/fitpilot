@@ -10,7 +10,7 @@ import type { Food } from '@/db/types';
 import { useProfile } from '@/hooks/useData';
 import { fmt, num, t } from '@/i18n';
 import { allergenMatches, macroKcalGap, nutrientsFor } from '@/lib/nutrition';
-import { norm } from '../workouts/ExercisePicker';
+import { searchFoods } from '@/lib/search';
 import { MICRO_KEYS, MICRO_UNITS, type MicroKey } from '@/lib/micros';
 import { Toggle } from '@/components/Toggle';
 
@@ -22,8 +22,10 @@ export function useFoodSearch() {
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState<string>('all');
   const filtered = useMemo(() => {
-    const q = norm(query.trim());
-    return foods.filter((f) => (cat === 'all' || (cat === 'custom' ? f.custom : f.category === cat)) && (!q || norm(f.name).includes(q)));
+    const inCat = foods.filter((f) => cat === 'all' || (cat === 'custom' ? f.custom : f.category === cat));
+    if (!query.trim()) return inCat;
+    // Recherche par mots, ordre libre : « thé sans sucre » trouve « Thé à la menthe sans sucre ».
+    return searchFoods(inCat, query, (f) => `${f.name} ${f.brand ?? ''}`).map((h) => h.item);
   }, [foods, query, cat]);
   return { filtered, query, setQuery, cat, setCat };
 }

@@ -183,3 +183,22 @@ test('captures phase B (sombre et clair)', async ({ page }) => {
     await page.screenshot({ path: `screenshots/pB-menus-${theme}.png`, fullPage: true });
   }
 });
+
+test('eau : quantité libre (300 ml) et recherche « thé sans sucre »', async ({ page }) => {
+  await completeOnboarding(page);
+  await page.goto('./#/nutrition');
+  await page.getByRole('button', { name: 'Autre quantité d’eau' }).click();
+  await page.getByLabel('Quantité bue').fill('300');
+  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
+  await page.getByRole('button', { name: '+150 ml' }).click();
+  await expect(page.getByTestId('water-total')).toContainText('450');
+  await page.getByRole('button', { name: 'Autre quantité d’eau' }).click();
+  await page.getByLabel('Quantité bue').fill('5000');
+  await expect(page.getByText('Entre 20 et 2 000 ml')).toBeVisible();
+  // Recherche par mots : aliment fourni et table CIQUAL.
+  await page.getByRole('button', { name: 'Ajouter au petit-déjeuner' }).click();
+  await page.getByRole('dialog').getByRole('searchbox').fill('thé sans sucre');
+  await expect(page.getByRole('dialog').getByRole('button', { name: /^Thé à la menthe sans sucre/ })).toBeVisible();
+  await expect(page.getByRole('dialog').getByRole('button', { name: /^Thé à la menthe sucré/ })).toHaveCount(0);
+  await expect(page.getByTestId('ciqual-results').getByText('Thé infusé, non sucré')).toBeVisible();
+});

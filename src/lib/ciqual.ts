@@ -4,6 +4,7 @@
 // marocains et ceux que tu as modifiés restent prioritaires dans la recherche.
 import type { Micros } from './micros';
 import { normalizeText } from './text';
+import { matchFood, tokens } from './search';
 
 export interface CiqualFile {
   source: string;
@@ -65,29 +66,24 @@ export function ciqualCategory(f: Pick<CiqualFood, 'group' | 'name'>): string {
 
 export interface CiqualIndex {
   foods: CiqualFood[];
-  keys: string[];
+  /** Mots (normalisés, racines) de chaque nom, calculés une fois. */
+  toks: string[][];
 }
 
 export function buildIndex(foods: CiqualFood[]): CiqualIndex {
-  return { foods, keys: foods.map((f) => normalizeText(f.name)) };
+  return { foods, toks: foods.map((f) => tokens(f.name)) };
 }
 
 /**
- * Recherche : tous les mots de la requête doivent apparaître (sans accents, sans casse).
- * Classement : nom qui commence par la requête, puis mot entier, puis nom le plus court.
+ * Recherche par mots (ordre libre, sans accents, « sans » = « non », début de mot suffisant).
+ * Les correspondances complètes passent avant les approchées, puis les noms les plus courts.
  */
 export function searchCiqual(index: CiqualIndex, query: string, limit = 30): CiqualFood[] {
-  const q = normalizeText(query).trim();
-  if (q.length < 2) return [];
-  const words = q.split(/\s+/).filter(Boolean);
+  if (normalizeText(query).trim().length < 2) return [];
   const hits: { f: CiqualFood; score: number }[] = [];
-  index.keys.forEach((key, i) => {
-    if (!words.every((w) => key.includes(w))) return;
-    let score = key.length / 100;
-    if (key.startsWith(q)) score -= 10;
-    else if (key.startsWith(words[0])) score -= 6;
-    if (new RegExp(`(^|[^a-z])${words[0]}([^a-z]|$)`).test(key)) score -= 3;
-    hits.push({ f: index.foods[i], score });
+  index.toks.forEach((t, i) => {
+    const m = matchFood(query, index.foods[i].name, t);
+    if (m) hits.push({ f: index.foods[i], score: m.score });
   });
   return hits
     .sort((a, b) => a.score - b.score)

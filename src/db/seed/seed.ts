@@ -10,9 +10,10 @@ import { MICRO_KEYS } from '@/lib/micros';
 /**
  * Versions des données de départ. Chaque étape ne tourne qu'une fois :
  * 1 = exercices + programmes (phase 2), 2 = aliments (phase 3),
- * 3 = micronutriments CIQUAL et prix indicatifs des aliments fournis (nutrition complète).
+ * 3 = micronutriments CIQUAL et prix indicatifs des aliments fournis (nutrition complète),
+ * 4 = boissons sans sucre (thé, café).
  */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 /**
  * Insère les exercices et programmes de base manquants (idempotent : basé sur les clés).
@@ -25,6 +26,8 @@ export async function ensureSeed(database: FitPilotDB = defaultDb): Promise<void
   if (done < 1) await seedTraining(database);
   if (done < 2) await seedFoods(database);
   if (done < 3) await seedFoodDetails(database);
+  // Nouveaux aliments fournis : seedFoods n'ajoute que les clés absentes.
+  if (done >= 2 && done < 4) await seedFoods(database);
   await updateSettings({ seedVersion: SEED_VERSION }, database);
 }
 
