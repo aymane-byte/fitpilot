@@ -8,6 +8,7 @@ import { GPS_FILTER, haversine, movingTime, totalDistance } from '@/lib/geo';
 import { altitudeCoverage } from '@/lib/elevation';
 import { autoPause, detectBestEfforts, trackElevation, type TrackPoint } from '@/lib/runAnalysis';
 import { cropTrack, matchesRoute, previewLength, trackPreview } from '@/lib/track';
+import { detectGaps, estimatedDistanceM, removeGap } from '@/lib/liveRun';
 import type { FavoriteRoute } from '@/db/types';
 import { demSampleIndices, elevationUrls, interpolateAltitudes, pickWeather, weatherUrl } from '@/lib/openMeteo';
 import { TrackImportError, type ImportedTrack } from '@/lib/gpx';
@@ -33,13 +34,15 @@ export const runEntrySchema = z
 export type RunEntry = z.infer<typeof runEntrySchema>;
 
 /** Résultats d'analyse calculés à partir des points (meilleurs efforts, dénivelé). */
-type Analysis = Pick<Run, 'bestEfforts' | 'elevGainM' | 'elevLossM' | 'elevSource' | 'analysisVersion' | 'preview'>;
+type Analysis = Pick<Run, 'bestEfforts' | 'elevGainM' | 'elevLossM' | 'elevSource' | 'analysisVersion' | 'preview' | 'estimatedM'>;
 
 export function analyzePoints(points: TrackPoint[]): Analysis {
   const out: Analysis = { analysisVersion: ANALYSIS_VERSION };
   if (!points.length) return out;
   out.bestEfforts = detectBestEfforts(points);
   out.preview = trackPreview(points);
+  // Lignes droites estimées pendant les trous GPS (incluses dans la distance, affichées à part).
+  out.estimatedM = estimatedDistanceM(points);
   // Altitude GPS exploitable seulement si la majorité des points en ont une.
   if (altitudeCoverage(points.map((p) => p.alt)) >= 0.5) {
     const elev = trackElevation(points, 'gps');
@@ -48,7 +51,7 @@ export function analyzePoints(points: TrackPoint[]): Analysis {
   return out;
 }
 
-const toRow = (runId: number, p: TrackPoint): RunPoint => ({ runId, t: p.t, lat: p.lat, lng: p.lng, accuracy: p.accuracy, seg: p.seg, ...(typeof p.alt === 'number' ? { alt: p.alt } : {}) });
+const toRow = (runId: number, p: TrackPoint & { gapBefore?: boolean }): RunPoint => ({ runId, t: p.t, lat: p.lat, lng: p.lng, accuracy: p.accuracy, seg: p.seg, ...(typeof p.alt === 'number' ? { alt: p.alt } : {}), ...(p.gapBefore ? { gapBefore: true } : {}) });
 
 /**
  * Enregistre une course (et ses points GPS) ; coche la course prévue ce jour-là.
@@ -106,6 +109,27 @@ export async function cropRun(runId: number, startM: number, endM: number): Prom
       durationSec: Math.max(1, res.durationSec),
       startedAt: res.points[0].t,
       cropped: true,
+    });
+  });
+}
+
+/**
+ * Retire après coup la ligne droite estimée d'un trou GPS : les points suivants passent dans un
+ * nouveau segment ; distance, temps (durée du trou), records et dénivelé sont recalculés.
+ */
+export async function removeRunGap(runId: number, pointIndex: number): Promise<void> {
+  const pts = await runPoints(runId);
+  const gap = detectGaps(pts).find((g) => g.index === pointIndex);
+  const run = await db.runs.get(runId);
+  if (!gap || !run) return;
+  const next = removeGap(pts, pointIndex);
+  const analysis = analyzePoints(next);
+  await db.transaction('rw', db.runs, db.runPoints, async () => {
+    await db.runPoints.bulkPut(next);
+    await db.runs.update(runId, {
+      ...analysis,
+      distanceKm: Math.max(0.01, Math.round((run.distanceKm - gap.distanceM / 1000) * 100) / 100),
+      durationSec: Math.max(1, run.durationSec - gap.sec),
     });
   });
 }
@@ -250,7 +274,23 @@ export function cleanImportedTrack(track: ImportedTrack): TrackPoint[] {
   return autoPause(kept);
 }
 
-export async function readTrackFile(file: File): Promise<ImportPreview> {
+/** Archive Strava : .gpx.gz / .fit.gz décompressés dans le navigateur (DecompressionStream, iOS 16.4+). */
+async function gunzip(file: File): Promise<File> {
+  if (typeof DecompressionStream === 'undefined') throw new TrackImportError('invalid');
+  const stream = file.stream().pipeThrough(new DecompressionStream('gzip'));
+  const buf = await new Response(stream).arrayBuffer();
+  return new File([buf], file.name.replace(/\.gz$/i, ''));
+}
+
+export async function readTrackFile(input: File): Promise<ImportPreview> {
+  let file = input;
+  if (/\.gz$/i.test(file.name)) {
+    try {
+      file = await gunzip(file);
+    } catch {
+      throw new TrackImportError('invalid');
+    }
+  }
   const lower = file.name.toLowerCase();
   let track: ImportedTrack;
   let format: 'gpx' | 'fit';

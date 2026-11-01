@@ -22,7 +22,7 @@ describe('migration v1 → v2', () => {
 
     const v2 = new FitPilotDB(name);
     await v2.open();
-    expect(v2.verno).toBe(6);
+    expect(v2.verno).toBe(7);
     // v4 : courses conservées, nouvelles tables vides, index shoeId utilisable.
     expect(await v2.runs.count()).toBe(1);
     expect(await v2.shoes.count()).toBe(0);

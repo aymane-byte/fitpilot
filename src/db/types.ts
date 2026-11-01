@@ -146,6 +146,8 @@ export interface Run {
   preview?: [number, number][];
   /** Recadrée par l'utilisateur (début / fin retirés). */
   cropped?: boolean;
+  /** Distance (m) estimée en ligne droite pendant des trous GPS (incluse dans distanceKm). */
+  estimatedM?: number;
 }
 
 /** Parcours favori : tracé de référence pour comparer ses temps sur le même trajet. */
@@ -169,6 +171,33 @@ export interface RunPoint {
   seg?: number;
   /** Altitude (m). */
   alt?: number;
+  /** Point qui suit un trou GPS (app suspendue) : la ligne depuis le point précédent est estimée. */
+  gapBefore?: boolean;
+}
+
+/** Course GPS en cours d'enregistrement (une seule ligne, id « current »). */
+export interface LiveRunState {
+  id: 'current';
+  status: 'running' | 'paused' | 'stopped';
+  seg: number;
+  activeMs: number;
+  resumedAt: number | null;
+  startedAt: number;
+  rejected: number;
+  /** Nombre de points déjà écrits dans livePoints. */
+  pointCount: number;
+  updatedAt: number;
+}
+
+export interface LivePoint {
+  id?: number;
+  t: number;
+  lat: number;
+  lng: number;
+  accuracy: number;
+  seg?: number;
+  alt?: number;
+  gapBefore?: boolean;
 }
 
 export interface Shoe {

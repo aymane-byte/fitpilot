@@ -29,6 +29,7 @@ const WorkoutsLibraryPage = lazy(() => import('@/features/running/WorkoutsLibrar
 const ActivitiesPage = lazy(() => import('@/features/running/ActivitiesPage').then((m) => ({ default: m.ActivitiesPage })));
 const RoutesPage = lazy(() => import('@/features/running/RoutesPage').then((m) => ({ default: m.RoutesPage })));
 const RouteDetailPage = lazy(() => import('@/features/running/RoutesPage').then((m) => ({ default: m.RouteDetailPage })));
+const StravaHelpPage = lazy(() => import('@/features/running/StravaHelpPage').then((m) => ({ default: m.StravaHelpPage })));
 const RunDetailPage = lazy(() => import('@/features/running/RunDetailPage').then((m) => ({ default: m.RunDetailPage })));
 const NutritionPage = lazy(() => import('@/features/nutrition/NutritionPage').then((m) => ({ default: m.NutritionPage })));
 const CoachPage = lazy(() => import('@/features/coach/CoachPage').then((m) => ({ default: m.CoachPage })));
@@ -98,6 +99,7 @@ export function App() {
             <Route path="course/activites" element={<ActivitiesPage />} />
             <Route path="course/parcours" element={<RoutesPage />} />
             <Route path="course/parcours/:id" element={<RouteDetailPage />} />
+            <Route path="course/import-strava" element={<StravaHelpPage />} />
             <Route path="course/:id" element={<RunDetailPage />} />
             <Route path="planning" element={<PlanningPage />} />
             <Route path="progres" element={<ProgressPage />} />

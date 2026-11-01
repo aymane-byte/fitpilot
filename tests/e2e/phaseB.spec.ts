@@ -109,13 +109,15 @@ test('mode Ramadan et cyclage des calories', async ({ page }) => {
   await expect(page.getByTestId('ramadan-card')).toContainText('Jeûne : 14 h 15');
   await expect(page.getByTestId('ramadan-card')).toContainText('19:05');
   await expect(page.getByRole('heading', { name: 'S’hour' })).toBeVisible();
-  // Cyclage : il faut un planning cette semaine.
-  await page.goto('./#/planning');
-  await page.getByRole('button', { name: 'Générer ma semaine' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Générer ma semaine' }).click();
-  await page.waitForTimeout(800);
+  // Cyclage : une séance faite aujourd'hui = jour d'entraînement (indépendant du jour du test).
+  await page.goto('./#/course');
+  await page.getByRole('button', { name: 'Saisir une course' }).click();
+  await page.getByLabel('Distance').fill('5');
+  await page.getByLabel('Durée').fill('30');
+  await page.getByRole('dialog').getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Course enregistrée' })).toBeVisible();
   await page.goto('./#/nutrition');
-  await expect(page.getByTestId('day-target-reason')).toContainText(/Jour d’entraînement|Jour de repos/);
+  await expect(page.getByTestId('day-target-reason')).toContainText(/Jour d’entraînement : \+\d+ kcal/);
 });
 
 test('photo de plat analysée par Gemini (réponse simulée), validée avant ajout', async ({ page }) => {

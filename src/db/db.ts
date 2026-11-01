@@ -26,6 +26,8 @@ export class FitPilotDB extends Dexie {
   runWorkouts!: EntityTable<T.RunWorkout, 'id'>;
   mealPlans!: EntityTable<T.MealPlanItem, 'id'>;
   routes!: EntityTable<T.FavoriteRoute, 'id'>;
+  liveRun!: EntityTable<T.LiveRunState, 'id'>;
+  livePoints!: EntityTable<T.LivePoint, 'id'>;
 
   constructor(name = 'fitpilot') {
     super(name);
@@ -78,6 +80,11 @@ export class FitPilotDB extends Dexie {
     // v6 (GPS avancé) : parcours favoris.
     this.version(6).stores({
       routes: '++id, name',
+    });
+    // v7 (fiabilité GPS) : course en cours sauvegardée en continu dans IndexedDB.
+    this.version(7).stores({
+      liveRun: 'id',
+      livePoints: '++id, t',
     });
   }
 }

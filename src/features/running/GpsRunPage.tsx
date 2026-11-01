@@ -27,7 +27,9 @@ import { useRunVoice } from './useRunVoice';
 import { speak, speechSupported, unlockSpeech, voicePrefs } from './speech';
 import { customToDef, resolveWorkout } from './workouts';
 
-const RouteMap = lazy(() => import('./RouteMap'));
+const RunMap = lazy(() => import('../maps/RunMap'));
+import { PocketMode } from './PocketMode';
+import { gapLabel } from '@/lib/liveRun';
 const gp = t.gpsRun;
 const x = t.runx;
 const WORKOUT_KEY = 'fitpilot-gps-workout';
@@ -64,7 +66,15 @@ export function GpsRunPage() {
   const [discarding, setDiscarding] = useState(false);
   const [picking, setPicking] = useState(false);
   // Course interrompue retrouvée : on demande quoi faire (reprendre, enregistrer, supprimer).
-  const [recoverOpen, setRecoverOpen] = useState(gps.recovered && gps.status === 'paused');
+  const [recoverOpen, setRecoverOpen] = useState(false);
+  const [pocket, setPocket] = useState(false);
+  // Brouillon chargé depuis IndexedDB : en pause → on demande quoi faire ; en cours → reprise auto.
+  const askedRecover = useRef(false);
+  useEffect(() => {
+    if (!gps.loaded || askedRecover.current) return;
+    askedRecover.current = true;
+    if (gps.recovered && gps.status === 'paused') setRecoverOpen(true);
+  }, [gps.loaded, gps.recovered, gps.status]);
   const prefs = useMemo(() => voicePrefs(settings?.voice), [settings?.voice]);
 
   // Annonce vocale de la pause et de la reprise automatiques.
@@ -121,11 +131,39 @@ export function GpsRunPage() {
             {gps.error === 'denied' ? gp.denied : gp.unavailable}
           </Notice>
         )}
-        {gps.status === 'idle' && <Notice icon={<Lock size={16} />}>{gp.honest}</Notice>}
+        {gps.status === 'idle' && (
+          <div role="note" className="flex items-start gap-2.5 rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-3 text-sm font-semibold text-warning" data-testid="start-warning">
+            <Lock size={18} className="mt-0.5 shrink-0" />
+            {t.gpsr.startWarn}
+          </div>
+        )}
+        {gps.recovered && gps.status === 'running' && <Notice>{t.gpsr.resumedAuto}</Notice>}
+        {gps.suspendedSec !== null && gps.status === 'running' && !gps.pendingGap && (
+          <Notice tone="warning" icon={<TriangleAlert size={16} />}>
+            {fmt(t.gpsr.suspended, { d: gapLabel(gps.suspendedSec) })}
+          </Notice>
+        )}
+        {gps.pendingGap && (
+          <Card className="!p-4 border-warning/50" data-testid="gap-card">
+            <p className="font-semibold text-warning">{fmt(t.gpsr.gapTitle, { d: gapLabel(gps.pendingGap.sec) })}</p>
+            <p className="mt-1 text-sm text-muted">{fmt(t.gpsr.gapText, { m: `${num(gps.pendingGap.distanceM / 1000, 2)} km` })}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button variant="secondary" onClick={gps.keepGap}>
+                {t.gpsr.gapKeep}
+              </Button>
+              <Button variant="secondary" onClick={gps.removeGap}>
+                {t.gpsr.gapRemove}
+              </Button>
+            </div>
+          </Card>
+        )}
         {(gps.status === 'running' || gps.status === 'paused') && (
           <div role="note" className="flex items-center gap-2.5 rounded-2xl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm font-semibold text-warning" data-testid="keep-on">
             <Smartphone size={18} className="shrink-0" />
-            {t.gpsx.keepOn}
+            <span className="min-w-0 flex-1">{t.gpsx.keepOn}</span>
+            <Button size="sm" onClick={() => setPocket(true)} className="shrink-0">
+              {t.gpsr.pocket}
+            </Button>
           </div>
         )}
 
@@ -199,7 +237,7 @@ export function GpsRunPage() {
 
         {gps.points.length > 0 && (
           <Suspense fallback={<div className="h-72 rounded-2xl bg-surface-2" />}>
-            <RouteMap points={gps.points} follow={gps.status === 'running'} className="h-72" />
+            <RunMap points={gps.points} live className="h-72" />
           </Suspense>
         )}
 
@@ -247,6 +285,7 @@ export function GpsRunPage() {
           )}
         </div>
       </div>
+      {pocket && (gps.status === 'running' || gps.status === 'paused') && <PocketMode elapsedSec={gps.elapsedSec} distanceM={gps.distanceM} wake={wake} onExit={() => setPocket(false)} />}
       <Sheet open={recoverOpen} onClose={() => setRecoverOpen(false)} title={t.gpsx.recoverTitle}>
         <div className="flex flex-col gap-3">
           <p className="text-muted">{fmt(t.gpsx.recoverText, { km: num(km, 2), time: formatDuration(gps.elapsedSec) })}</p>

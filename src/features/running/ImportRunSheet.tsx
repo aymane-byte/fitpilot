@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FileUp, TriangleAlert } from 'lucide-react';
 import { Sheet } from '@/components/Sheet';
 import { Button } from '@/components/Button';
@@ -59,7 +59,10 @@ export function ImportRunSheet({ open, onClose }: { open: boolean; onClose: () =
     <Sheet open={open} onClose={onClose} title={x.importTitle}>
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted">{x.importText}</p>
-        <input ref={input} type="file" accept=".gpx,.fit,application/gpx+xml,application/octet-stream" className="sr-only" aria-label={x.chooseFile} onChange={(e) => onFile(e.target.files?.[0])} />
+        <Link to="/course/import-strava" onClick={onClose} className="text-sm font-semibold text-accent-text underline underline-offset-2">
+          {t.gpsr.stravaTitle} : {t.gpsr.stravaHint}
+        </Link>
+        <input ref={input} type="file" accept=".gpx,.fit,.gz,application/gpx+xml,application/octet-stream,application/gzip" className="sr-only" aria-label={x.chooseFile} onChange={(e) => onFile(e.target.files?.[0])} />
         <Button size="lg" variant="secondary" block disabled={busy} onClick={() => input.current?.click()} icon={<FileUp size={18} />}>
           {busy ? x.importReading : x.chooseFile}
         </Button>

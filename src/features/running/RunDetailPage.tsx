@@ -25,12 +25,14 @@ import { formatDuration, formatPace, paceSecPerKm, runCaloriesEstimate, speedKmh
 import { heatAdvice, weatherLabel } from '@/lib/openMeteo';
 import { buildGpx } from '@/lib/gpx';
 import { RUN_TYPES } from '@/lib/runTypes';
-import { cropRun, deleteRun, enrichRun, routeRuns, saveRouteFromRun, updateRun } from './service';
+import { cropRun, deleteRun, enrichRun, removeRunGap, routeRuns, saveRouteFromRun, updateRun } from './service';
 import { cumulative } from '@/lib/runAnalysis';
 import { RpePicker, ShoeSelect } from './RunControls';
-import { PACE_COLORS } from './RouteMap';
+import { PACE_SCALE } from '@/lib/routeGeo';
+import { detectGaps, gapLabel } from '@/lib/liveRun';
 
-const RouteMap = lazy(() => import('./RouteMap'));
+// MapLibre n'est chargé qu'à l'affichage de la carte.
+const RunMap = lazy(() => import('../maps/RunMap'));
 const r = t.run;
 const x = t.runx;
 
@@ -98,6 +100,9 @@ export function RunDetailPage() {
   ];
   if (run.elevGainM !== undefined) stats.push([x.elevation, `+${run.elevGainM} / −${run.elevLossM ?? 0} m`]);
   if (hasTrack && Math.abs(analysis.moving - run.durationSec) > 30) stats.push([x.moving, formatDuration(analysis.moving)]);
+  const gaps = detectGaps(points);
+  const estimatedM = gaps.reduce((s, g) => s + g.distanceM, 0);
+  if (estimatedM > 0) stats.push([t.gpsr.estimated, `${num(estimatedM / 1000, 2)} km`]);
 
   async function exportGpx() {
     const name = run!.name ?? `${r.types[run!.type]} ${run!.date}`;
@@ -154,8 +159,8 @@ export function RunDetailPage() {
           <CardTitle icon={<MapIcon size={18} />}>{r.route}</CardTitle>
           {hasTrack ? (
             <>
-              <Suspense fallback={<div className="h-64 rounded-2xl bg-surface-2" />}>
-                <RouteMap points={points} colored={colored ? analysis.pace.lines : undefined} />
+              <Suspense fallback={<div className="h-72 rounded-2xl bg-surface-2" />}>
+                <RunMap points={points} colored={colored} className="h-72" />
               </Suspense>
               {analysis.pace.lines.length > 0 && (
                 <div className="mt-3 flex flex-col gap-2">
@@ -163,7 +168,7 @@ export function RunDetailPage() {
                   {colored && (
                     <div className="flex items-center gap-2 text-xs text-muted" aria-label={`${x.fast} ${formatPace(analysis.pace.fast)} – ${x.slow} ${formatPace(analysis.pace.slow)}`}>
                       <span className="num">{x.fast} {formatPace(analysis.pace.fast)}</span>
-                      <span className="h-2 flex-1 rounded-full" style={{ background: `linear-gradient(90deg, ${PACE_COLORS.join(',')})` }} />
+                      <span className="h-2 flex-1 rounded-full" style={{ background: `linear-gradient(90deg, ${PACE_SCALE.join(',')})` }} />
                       <span className="num">{formatPace(analysis.pace.slow)} {x.slow}</span>
                     </div>
                   )}
@@ -174,6 +179,30 @@ export function RunDetailPage() {
             <p className="text-sm text-muted">{r.noRoute}</p>
           )}
         </Card>
+
+        {gaps.length > 0 && (
+          <Card data-testid="gaps-card">
+            <CardTitle>{t.gpsr.gapsTitle}</CardTitle>
+            <p className="mb-2 text-sm text-muted">{fmt(t.gpsr.estimatedHint, { m: `${num(estimatedM / 1000, 2)} km` })}</p>
+            <ul className="flex flex-col gap-2">
+              {gaps.map((g) => (
+                <li key={g.index} className="flex items-center justify-between gap-2 rounded-2xl bg-surface-2 px-3 py-2 text-sm">
+                  <span className="num">{fmt(t.gpsr.gapLine, { d: gapLabel(g.sec), m: `${num(g.distanceM / 1000, 2)} km` })}</span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={async () => {
+                      await removeRunGap(run.id!, g.index);
+                      toast(t.gpsr.gapRemoveDone);
+                    }}
+                  >
+                    {t.gpsr.gapRemove}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         {ranks.length > 0 && (
           <Card>

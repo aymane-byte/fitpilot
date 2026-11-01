@@ -86,6 +86,8 @@ export async function exportData(
   const tables: Record<string, Row[]> = {};
   for (const table of database.tables) {
     if (table.name === 'progressPhotos' && !opts.includePhotos) continue;
+    // Course GPS en cours : état temporaire, propre à ce téléphone.
+    if (table.name === 'liveRun' || table.name === 'livePoints') continue;
     const rows = (await table.toArray()) as Row[];
     tables[table.name] = await Promise.all(
       rows.map((r) => {

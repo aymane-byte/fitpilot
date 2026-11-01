@@ -121,3 +121,70 @@ textarea {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
+
+/* Cartes MapLibre : marqueurs (HTML), position en direct, info-bulle. */
+/* Les marqueurs laissent passer le toucher : on peut toucher le tracé juste en dessous. */
+.maplibregl-marker:has(.fp-km),
+.maplibregl-marker.fp-km,
+.fp-start,
+.fp-finish,
+.fp-km,
+.fp-pos {
+  pointer-events: none;
+}
+.fp-start,
+.fp-finish {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
+}
+.fp-start {
+  background: #16a34a;
+}
+.fp-finish {
+  /* Damier d'arrivée */
+  background: conic-gradient(#111 0 25%, #fff 0 50%, #111 0 75%, #fff 0) 0 0 / 8px 8px;
+}
+.fp-km {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: #fff;
+  color: #111;
+  font: 700 11px/20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  font-variant-numeric: tabular-nums;
+}
+.fp-pos {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #2f80ff;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 0 rgb(47 128 255 / 0.45);
+  animation: fp-halo 2s ease-out infinite;
+}
+@keyframes fp-halo {
+  0% { box-shadow: 0 0 0 0 rgb(47 128 255 / 0.5); }
+  100% { box-shadow: 0 0 0 22px rgb(47 128 255 / 0); }
+}
+.fp-popup .maplibregl-popup-content {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+.fp-popup .maplibregl-popup-tip {
+  display: none;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}

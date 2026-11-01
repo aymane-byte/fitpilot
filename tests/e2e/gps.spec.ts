@@ -64,7 +64,7 @@ test('pause automatique au feu rouge puis reprise ; écran d’enregistrement', 
   expect(sec).toBeGreaterThan(25);
 });
 
-test('app fermée en pleine course : bannière, puis reprendre ou enregistrer', async ({ page, context }) => {
+test('app fermée en pleine course : bannière, reprise automatique, puis enregistrement', async ({ page, context }) => {
   test.setTimeout(120_000);
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: 33.5, longitude: -7.6, accuracy: 5 });
@@ -77,11 +77,11 @@ test('app fermée en pleine course : bannière, puis reprendre ou enregistrer', 
   await page.reload();
   await expect(page.getByTestId('draft-banner')).toContainText('Course GPS non terminée');
   await page.getByTestId('draft-banner').click();
-  const dialog = page.getByRole('dialog', { name: 'Course non terminée' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: 'Terminer et enregistrer' }).click();
+  // Course « en cours » au moment de la fermeture : l'enregistrement reprend tout seul.
+  await expect(page.getByText('Course reprise automatiquement')).toBeVisible();
+  await page.getByRole('button', { name: 'Terminer' }).click();
   await page.getByRole('button', { name: 'Enregistrer la course' }).click();
-  await expect(page.getByText('Parcours').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Parcours' })).toBeVisible({ timeout: 30_000 }); // WebKit de test : écriture IndexedDB lente
   await page.goto('./#/');
   await expect(page.getByTestId('draft-banner')).toHaveCount(0);
 });

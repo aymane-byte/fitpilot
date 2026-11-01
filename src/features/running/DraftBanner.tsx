@@ -1,15 +1,22 @@
-import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { MapPin } from 'lucide-react';
+import { db } from '@/db/db';
 import { fmt, num, t } from '@/i18n';
+import { totalDistance } from '@/lib/geo';
+import { elapsedMs } from '@/lib/liveRun';
 import { formatDuration } from '@/lib/running';
-import { draftSummary } from './useGpsTracker';
 
-/** Course GPS non terminée (app fermée en pleine course) : bannière pour la reprendre ou l'enregistrer. */
+/** Course GPS en cours ou interrompue (app fermée en pleine course) : bannière pour y revenir. */
 export function DraftBanner() {
   const { pathname } = useLocation();
-  const [summary, setSummary] = useState(draftSummary);
-  useEffect(() => setSummary(draftSummary()), [pathname]);
+  const summary = useLiveQuery(async () => {
+    const s = await db.liveRun.get('current');
+    if (!s) return null;
+    const pts = await db.livePoints.orderBy('t').toArray();
+    if (pts.length < 2) return null;
+    return { distanceM: totalDistance(pts), activeSec: Math.round(elapsedMs(s, Date.now()) / 1000) };
+  });
   if (!summary || pathname === '/course/gps') return null;
   return (
     <Link

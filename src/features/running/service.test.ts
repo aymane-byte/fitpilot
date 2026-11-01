@@ -124,7 +124,7 @@ describe('sauvegarde', () => {
     const backup = await exportData({ includePhotos: false });
     expect(backup.tables.shoes).toHaveLength(1);
     expect(backup.tables.runWorkouts).toHaveLength(1);
-    expect(backup.schemaVersion).toBe(6);
+    expect(backup.schemaVersion).toBe(7);
   });
 });
 

@@ -92,7 +92,7 @@ test('course GPS simulée : départ, points, enregistrement', async ({ page, con
   await page.getByRole('button', { name: 'Terminer' }).click();
   await page.getByRole('button', { name: 'Enregistrer la course' }).click();
   await expect(page.getByRole('heading', { name: 'Parcours' })).toBeVisible();
-  await expect(page.locator('.leaflet-container')).toBeVisible();
+  await expect(page.getByTestId('run-map').locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 20_000 });
 });
 
 test('planning : semaine générée sans conflit, alerte si course après jambes', async ({ page }) => {

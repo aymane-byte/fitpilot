@@ -48,10 +48,20 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 - Historique, records, 1RM estimé (formule d'Epley), courbe de progression.
 
 ### Course
-- Saisie manuelle (allure, vitesse, calories estimées, chaussures, effort ressenti) ou **suivi GPS** avec carte OpenStreetMap. Les points GPS imprécis ou impossibles sont filtrés, et l'écran reste allumé quand l'iPhone le permet.
+- Saisie manuelle (allure, vitesse, calories estimées, chaussures, effort ressenti) ou **suivi GPS** avec carte vectorielle (MapLibre + OpenFreeMap). Les points GPS imprécis ou impossibles sont filtrés, et l'écran reste allumé quand l'iPhone le permet.
 - **Écran d'enregistrement** : temps en très grand, distance, allure actuelle et moyenne, carte en direct, gros boutons Pause et Terminer, et bannière permanente « Garde l'écran allumé ».
 - **Pause automatique** (désactivable) : après ~10 s immobile (feu rouge), le chrono s'arrête et le temps d'arrêt n'est pas compté. Il reprend dès que tu t'éloignes de 12 m. Une annonce vocale signale la pause et la reprise.
-- **Rien n'est perdu** : le parcours est sauvegardé toutes les 5 s, et tout de suite quand l'app passe en arrière-plan. Si FitPilot se ferme, une bannière propose au retour de reprendre la course ou de l'enregistrer.
+- **Rien n'est perdu** : l'état de la course et les points GPS sont écrits dans IndexedDB toutes les 5 s, et tout de suite quand l'app passe en arrière-plan. Si FitPilot est fermée ou rechargée en pleine course, l'enregistrement **reprend automatiquement**. Une course mise en pause propose « Reprendre / Enregistrer / Supprimer ».
+- **Chrono exact** : le temps est calculé à partir des horodatages (départ, pauses, reprises), jamais en comptant des secondes. Il reste juste même si iOS a suspendu l'app.
+- **Trous GPS** : plus de 30 s sans position pendant la course (écran verrouillé, app en arrière-plan) déclenche le message « GPS interrompu pendant X min ». Les deux points sont reliés par une ligne droite estimée, en pointillés sur la carte. La distance estimée apparaît à part dans le détail, et tu choisis de garder ou de retirer cette partie, pendant la course comme après.
+- **Mode poche** :
+  - écran entièrement noir, Wake Lock actif ;
+  - tactile verrouillé, déverrouillage par appui long (1,5 s) ou glissement vers le haut ;
+  - annonces vocales toujours actives ;
+  - temps et distance en tout petit, gris très sombre.
+
+  Au démarrage, un avertissement rappelle : « Ne verrouille pas l'écran, utilise le mode poche ».
+- **Importer depuis Strava** : écran d'aide pour exporter un GPX sur strava.com, ou toute l'archive. Les fichiers `.gpx.gz` / `.fit.gz` de l'archive sont acceptés tels quels.
 - **Mes activités** : liste avec mini-carte du tracé, filtres (semaine, mois, année, type) et tri (récentes, anciennes, distance, allure, durée).
 - **Parcours favoris** : enregistre le tracé d'une course. FitPilot retrouve ensuite toutes les courses faites sur ce trajet (distance à ±12 %, tracé à moins de 60 m dans les deux sens), les classe par temps, affiche l'écart au record et l'évolution, et indique sur chaque course son rang sur le parcours.
 - **Modifier une activité** : nom, note, type, chaussures et effort ressenti. Tu peux aussi la **recadrer** (retirer le début ou la fin, distance et records recalculés) ou la supprimer.
@@ -64,7 +74,18 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 - **Dénivelé** : altitude GPS lissée (filtre médian, moyenne glissante, hystérésis de 5 m). Si la course n'a pas d'altitude, elle est récupérée via l'API gratuite d'élévation **Open-Meteo**.
 - **Annonces vocales** en français à chaque km (temps, allure du km, allure moyenne), réglables dans Paramètres.
 - **Séances guidées** : fractionnés, tempo, allure cible, et séances perso. La voix annonce le début et la fin de chaque répétition, et dit « trop rapide » ou « trop lent » (au plus toutes les 30 s).
-- **Carte de chaleur** de toutes les courses (12 mois, 3 mois ou tout).
+- **Cartes vectorielles MapLibre GL + OpenFreeMap** :
+  - nettes sur écran Retina, zoom fluide, rotation désactivée ;
+  - fond « positron » (clair épuré) ou « dark » (sombre), selon le thème de l'app ;
+  - tracé épais avec contour, coins arrondis, couleur selon l'allure (9 nuances, légende) ;
+  - départ vert, arrivée en damier, marqueurs de km ;
+  - toucher le tracé affiche la distance, l'allure et l'altitude à cet endroit ;
+  - ombrage du **relief** en option ;
+  - carte en direct avec point de position et halo, suivi de la position et bouton « Recentrer ».
+
+  MapLibre n'est chargé que sur les écrans qui ont une carte.
+- **Carte de chaleur** de toutes les courses (lignes lumineuses superposées ; 12 mois, 3 mois ou tout).
+- **Mini-cartes** de l'historique : images du tracé dessinées une fois en canvas, sans vraie carte par ligne.
 - **Charge d'entraînement** : forme (CTL, 42 j), fatigue (ATL, 7 j), fraîcheur (TSB). Chaque course reçoit un score = durée × intensité² × 100, l'intensité venant de l'effort ressenti, sinon de l'allure par rapport au seuil, sinon du type de course. Le calcul est expliqué dans l'app.
 - **VDOT** (formule de Daniels) d'après le meilleur effort des 6 derniers mois, temps prédits 5 km / 10 km / semi / marathon et allures d'entraînement. Tout est marqué « estimation ».
 - **Chaussures** : km par paire (y compris les km d'avant), paire par défaut, alerte vers 600–800 km (seuil réglable).
@@ -131,9 +152,14 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 
 - **Pas de notifications push** : il faudrait un serveur. Les rappels s'affichent à l'ouverture de l'app. Pour des alertes à heure fixe, exporte ton planning vers Calendrier.
 - **GPS sur iPhone** : une app web ne suit pas la position quand l'écran est verrouillé ou l'app en arrière-plan. Garde FitPilot ouvert pendant la course. Une course interrompue est récupérée à la réouverture.
+- **À tester sur un vrai iPhone** : le mode poche (Wake Lock dans l'app installée selon la version d'iOS, appui long), la reprise automatique après une vraie fermeture par iOS, la détection d'un vrai trou GPS écran verrouillé, et la fluidité des cartes. Tout cela a été vérifié avec une horloge et des positions simulées dans le WebKit de Playwright, pas sur un appareil.
 - **Pause automatique** : elle se décide sur les positions GPS. Si l'iPhone en envoie moins quand tu es immobile, la pause peut se déclencher quelques secondes plus tard. Testée avec un GPS simulé, **pas encore lors d'une vraie course**.
 - **Voix** : les annonces s'arrêtent aussi quand l'écran se verrouille, et la première lecture doit suivre un toucher (bouton Démarrer). Le WebKit de test n'a pas de synthèse vocale : la voix n'a été vérifiée qu'à travers le texte annoncé, **pas encore à l'oreille sur iPhone**.
 - **Impossible dans une PWA iOS** (non simulé) : Apple Santé (pas d'API web), ceinture cardio Bluetooth (pas de Web Bluetooth dans Safari), GPS écran verrouillé. L'intensité vient donc de l'effort ressenti ou de l'allure.
+- **Cartes — sources et conditions vérifiées le 01/11/2026** :
+  - **OpenFreeMap** : gratuit, sans clé ni limite, usage commercial autorisé, attribution OpenStreetMap obligatoire (affichée en bas, détail derrière le bouton (i)). Le téléchargement de zones pour le hors-ligne n'est permis qu'avec un User-Agent propre à l'app, ce qu'un navigateur ne peut pas envoyer : FitPilot ne télécharge donc aucune zone. Il garde seulement en cache les tuiles déjà affichées (≤ 1 500 tuiles, 30 jours). Sans réseau et sans cache, le tracé s'affiche sur un fond neutre.
+  - **Relief** : « Terrain Tiles » (Registre de données ouvertes AWS, Mapzen). Attribution des sources (USGS SRTM/GMTED, NOAA ETOPO1, EU-DEM…) dans la carte.
+  - **Satellite : non ajouté**. La seule source gratuite trouvée (Sentinel-2 Cloudless d'EOX) annonce une licence non commerciale, mais je n'ai pas pu en lire le texte intégral : je ne l'active pas sans vérification. De plus, sa résolution (10 m) est floue à l'échelle d'une rue.
 - **Météo et altitude de secours** viennent d'Open-Meteo (gratuit, usage non commercial). Hors-ligne, elles sont récupérées plus tard, à l'ouverture de la course. La météo est celle d'une grille de modèle, pas d'une station au coin de la rue.
 - **Vibration** : Safari sur iPhone ne permet pas aux sites web de vibrer. La fin du repos est signalée par un son (mode silencieux désactivé).
 - **Valeurs nutritionnelles** : valeurs de référence arrondies (USDA FoodData Central, CIQUAL). Les plats traditionnels sont des estimations.
