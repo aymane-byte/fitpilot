@@ -198,3 +198,18 @@ describe('photo de plat (Gemini simulé)', () => {
     await expect(analyzeMealPhoto(img, (async () => new Response('{}', { status: 429 })) as unknown as typeof fetch)).rejects.toBeInstanceOf(VisionError);
   });
 });
+
+describe('anciens repas sans micronutriments (bug « ça marche chez ma sœur »)', () => {
+  it('recalculés une fois d’après l’aliment ; ajouts rapides ignorés', async () => {
+    const lent = await food({ name: 'Lentilles', fiberG: 8, ironMg: 2.5 });
+    const meal = (await db.meals.add({ date: '2026-10-01', type: 'lunch' })) as number;
+    // Repas noté avec une ancienne version : pas de champ micronutriment.
+    await db.mealItems.add({ mealId: meal, foodId: lent.id!, grams: 200, name: 'Lentilles', kcal: 232, proteinG: 18, carbsG: 40, fatG: 1 });
+    await addQuickItem('2026-10-01', 'lunch', { name: 'Sandwich', kcal: 400 });
+    expect((await dayMicros('2026-10-01')).fiberG.coverage).toBe(0);
+    const { backfillItemMicros } = await import('./service');
+    expect(await backfillItemMicros()).toBe(1);
+    expect(await dayMicros('2026-10-01')).toMatchObject({ fiberG: { value: 16, coverage: 1 }, ironMg: { value: 5, coverage: 1 } });
+    expect(await backfillItemMicros()).toBe(0); // une seule fois
+  });
+});

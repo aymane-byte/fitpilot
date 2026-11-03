@@ -106,3 +106,21 @@ describe('coach : intégration', () => {
     expect(compactSummary(buildContext(raw(extra))).length).toBeLessThan(3500);
   });
 });
+
+describe('coach : question sur un aliment', () => {
+  const dattes = { name: 'Dattes', category: 'fruit', kcal: 282, proteinG: 2.5, carbsG: 75, fatG: 0.4, sugarsG: 64, fiberG: 2.5, units: [{ label: 'datte', grams: 8 }] };
+  it('réponse par règles : convient-il, comment, combien (darija ou français)', () => {
+    const ctx = buildContext(raw({ food: dattes }));
+    const a = rulesReply('wach nakol tmar ? chhal khasni nakol ?', ctx);
+    expect(a).toMatch(/^Dattes : 282 kcal/);
+    expect(a).toMatch(/Quantité conseillée : environ \d+ g \(≈ [\d,]+ × datte\)/);
+    expect(a).toMatch(/Comment le manger/);
+    // Question médicale : la sécurité passe avant.
+    expect(rulesReply('Je peux manger des dattes avec mon diabète ?', ctx)).toMatch(/médecin/);
+  });
+  it('aliment transmis au LLM dans le résumé compact', () => {
+    const s = JSON.parse(compactSummary(buildContext(raw({ food: dattes }))));
+    expect(s.alimentCite.nom).toBe('Dattes');
+    expect(s.alimentCite.pour100g.kcal).toBe(282);
+  });
+});

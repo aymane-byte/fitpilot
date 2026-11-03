@@ -77,7 +77,8 @@ export function App() {
   useApplyTheme(settings?.theme);
   // Exercices et programmes de base (idempotent ; relancé aussi après une restauration).
   useEffect(() => {
-    void ensureSeed();
+    // Après les données de départ (micronutriments des aliments fournis), on complète les anciens repas.
+    void ensureSeed().then(() => import('@/features/nutrition/service').then((m) => m.backfillItemMicros()));
   }, [settings?.seedVersion]);
   return (
     <ToastProvider>

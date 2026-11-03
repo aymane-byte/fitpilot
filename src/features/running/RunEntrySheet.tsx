@@ -69,7 +69,7 @@ export function RunEntrySheet({ open, onClose }: { open: boolean; onClose: () =>
             </div>
             <div className="rounded-2xl bg-surface-2 p-2.5">
               <p className="text-xs text-muted">{r.calories}*</p>
-              <p className="num font-semibold">{weight ? `${runCaloriesEstimate(weight, distance!)} kcal` : '—'}</p>
+              <p className="num font-semibold">{weight ? `${runCaloriesEstimate(weight, distance!, type)} kcal` : '—'}</p>
             </div>
           </div>
         )}

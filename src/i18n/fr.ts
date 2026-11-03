@@ -469,7 +469,7 @@ export const fr = {
   },
   run: {
     title: 'Course',
-    types: { easy: 'Footing', tempo: 'Tempo', intervals: 'Fractionné', long: 'Sortie longue', recovery: 'Récupération' } as Record<string, string>,
+    types: { easy: 'Footing', tempo: 'Tempo', intervals: 'Fractionné', long: 'Sortie longue', recovery: 'Récupération', walk: 'Marche', hike: 'Randonnée', bike: 'Vélo' } as Record<string, string>,
     week: 'Cette semaine',
     month: 'Ce mois',
     add: 'Saisir une course',
@@ -518,7 +518,7 @@ export const fr = {
     nextMonth: 'Mois suivant',
     speed: 'Vitesse',
     calories: 'Calories',
-    caloriesEstimate: 'estimation (≈ 1 kcal/kg/km)',
+    caloriesEstimate: 'estimation selon l’activité (course ≈ 1 kcal/kg/km)',
     saved: 'Course enregistrée',
     errDistance: 'Distance entre 0,1 et 300 km',
     errDuration: 'Durée invalide',
@@ -643,7 +643,7 @@ export const fr = {
       invalid: 'Fichier illisible : choisis un fichier .gpx ou .fit.',
       empty: 'Ce fichier ne contient aucun point GPS.',
       noTime: 'Ce GPX n’a pas d’horodatage : impossible de calculer la durée.',
-      notRun: 'Ce fichier n’est pas une course à pied (vélo, natation…).',
+      notRun: 'Activité non prise en charge (natation, ski…). Course, marche, randonnée et vélo sont acceptés.',
       pace: 'Allure irréaliste : ce fichier n’est probablement pas une course à pied.',
     } as Record<string, string>,
     // Forme & performances
@@ -1145,6 +1145,14 @@ export const fr = {
     slotIntense: '{from}–{to} : séance intense 1 h 30 après le ftour (muscu, fractionné).',
     ramadanSafety: 'Pas de séance intense à jeun sous la chaleur. Si tu as des vertiges, arrête et romps le jeûne si nécessaire ; en cas de traitement ou de maladie, demande l’avis d’un médecin.',
     ramadanTimesBad: 'Vérifie les heures du s’hour et du ftour dans Paramètres.',
+  },
+  coachx: {
+    attach: 'Joindre une photo',
+    removePhoto: 'Retirer la photo',
+    photoAlt: 'Photo envoyée au coach',
+    photoNeedsGemini: 'Pour analyser une photo, il faut une clé Gemini gratuite (Paramètres > Coach IA). Le coach par règles ne voit pas les images. Tu peux décrire le plat en texte (ex. « wach nakol tajine b dja3 ? combien ? »), ou utiliser Nutrition > + > Photo IA.',
+    photoDefault: 'Qu’est-ce que tu vois sur cette photo ? Donne-moi les aliments, les quantités estimées et si ça convient à mon objectif.',
+    viaGemini: 'Photo analysée par Gemini',
   },
   coach: {
     title: 'FitPilot Coach',

@@ -7,6 +7,7 @@ import { nutritionReport, type DayNutrition, type NutritionReport } from '../nut
 import type { FormZone } from '../load';
 import type { MicroKey, MicroTarget, MicroTotal } from '../micros';
 import type { ShoeStatus } from '../runGoals';
+import type { FoodInfo } from './foodAdvice';
 
 /** Données complémentaires (course avancée, micronutriments, Ramadan, chaussures). Toutes facultatives. */
 export interface CoachExtra {
@@ -16,6 +17,8 @@ export interface CoachExtra {
   micros?: { avg: Partial<Record<MicroKey, MicroTotal>>; targets: Partial<Record<MicroKey, MicroTarget>>; days: number } | null;
   ramadan?: { suhoor: string; iftar: string; waterMl: number } | null;
   shoes?: { name: string; km: number; alertKm: number; status: ShoeStatus }[];
+  /** Aliment cité dans la question en cours (valeurs pour 100 g). */
+  food?: FoodInfo | null;
 }
 
 export interface CoachRawData {
@@ -148,6 +151,9 @@ export function compactSummary(ctx: CoachContext): string {
       : undefined,
     ramadan: ctx.raw.extra?.ramadan ?? undefined,
     chaussuresUsees: ctx.raw.extra?.shoes?.filter((s) => s.status !== 'ok').map((s) => `${s.name} ${s.km}/${s.alertKm} km`),
+    alimentCite: ctx.raw.extra?.food
+      ? (({ name, kcal, proteinG, carbsG, fatG, fiberG, sugarsG, saltG, units }) => ({ nom: name, pour100g: { kcal, proteinG, carbsG, fatG, fiberG, sugarsG, saltG }, unites: units }))(ctx.raw.extra.food)
+      : undefined,
     jours: ctx.days,
   });
 }

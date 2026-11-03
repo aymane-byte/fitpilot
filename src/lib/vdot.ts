@@ -1,6 +1,7 @@
 // VDOT (Jack Daniels & Jimmy Gilbert, « Oxygen Power », 1979) : estimation de la VO2max
 // « effective » à partir d'une performance, et prédictions de temps sur d'autres distances.
 // Ce sont des ESTIMATIONS : elles supposent un effort maximal et un entraînement adapté à la distance.
+import { isRunning } from './runTypes';
 
 /** Coût en oxygène (ml/kg/min) à la vitesse v (m/min). */
 export function vo2AtSpeed(v: number): number {
@@ -102,11 +103,12 @@ const EFFORT_M: Record<string, number> = { '1mi': 1609.344, '5k': 5000, '10k': 1
  * entières d'au moins 3 km (le meilleur VDOT l'emporte, une sortie facile ne le fait pas baisser).
  */
 export function performancesFromRuns(
-  runs: { id?: number; date: string; distanceKm: number; durationSec: number; bestEfforts?: Partial<Record<string, number>> }[],
+  runs: { id?: number; date: string; type?: string; distanceKm: number; durationSec: number; bestEfforts?: Partial<Record<string, number>> }[],
   wholeRunLabel: (km: number) => string = (km) => `course entière de ${km} km`,
 ): Performance[] {
   const out: Performance[] = [];
-  for (const r of runs) {
+  // VDOT : course à pied seulement (marche, rando et vélo n'indiquent pas la forme en course).
+  for (const r of runs.filter((x) => isRunning(x.type))) {
     for (const [key, sec] of Object.entries(r.bestEfforts ?? {})) {
       if (sec && EFFORT_M[key]) out.push({ distanceM: EFFORT_M[key], sec, date: r.date, runId: r.id, label: EFFORT_LABELS[key] });
     }

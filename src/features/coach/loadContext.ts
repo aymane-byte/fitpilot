@@ -9,9 +9,10 @@ import { runInsights } from '@/lib/runInsights';
 import { averageMicros, microTargets } from '@/lib/micros';
 import { shoeKm, shoeStatus } from '@/lib/runGoals';
 import type { CoachExtra } from '@/lib/coach/context';
+import { findFoodInMessage, FOOD_QUESTION, type FoodInfo } from '@/lib/coach/foodAdvice';
 
 /** Rassemble les 28 derniers jours de données et construit le contexte du coach. */
-export async function loadCoachContext(today = todayISO()): Promise<CoachContext | null> {
+export async function loadCoachContext(today = todayISO(), question?: string): Promise<CoachContext | null> {
   const profile = await db.profile.get('me');
   if (!profile) return null;
   const from = addDays(today, -27);
@@ -40,13 +41,30 @@ export async function loadCoachContext(today = todayISO()): Promise<CoachContext
     profile,
     currentWeightKg: current,
     targets,
-    extra: await loadExtra(today, profile, targets),
+    extra: { ...(await loadExtra(today, profile, targets)), food: question ? await foodInQuestion(question) : null },
     weights: weights.map((w) => ({ date: w.date, value: w.weightKg! })),
     nutrition,
     workouts,
     runs: runs.map((r) => ({ date: r.date, km: r.distanceKm, sec: r.durationSec, type: r.type })),
     scheduled,
   });
+}
+
+/**
+ * Aliment cité dans la question : d'abord tes aliments (marocains, perso, modifiés), puis la table
+ * CIQUAL si rien n'est trouvé. null si la question ne parle pas d'un aliment.
+ */
+async function foodInQuestion(question: string): Promise<FoodInfo | null> {
+  const local = findFoodInMessage(question, await db.foods.toArray());
+  if (local) return local;
+  if (!FOOD_QUESTION.test(question)) return null;
+  try {
+    const { loadCiqual } = await import('../nutrition/sources');
+    const idx = await loadCiqual();
+    return findFoodInMessage(question, idx.foods);
+  } catch {
+    return null;
+  }
 }
 
 /** Charge (toutes les courses), micronutriments des 7 derniers jours terminés, Ramadan, chaussures. */

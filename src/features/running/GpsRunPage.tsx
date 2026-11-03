@@ -16,7 +16,7 @@ import { useSettings } from '@/hooks/useData';
 import { fmt, num, t } from '@/i18n';
 import { todayISO, toISODate } from '@/lib/dates';
 import { formatDuration, formatPace, paceSecPerKm } from '@/lib/running';
-import { RUN_TYPES, type RunTypeKey } from '@/lib/runTypes';
+import { maxSpeedFor, RUN_TYPES, type RunTypeKey } from '@/lib/runTypes';
 import { totalDistance } from '@/lib/geo';
 import { builtinWorkouts, stepLabel, type FlatStep } from '@/lib/guided';
 import { spokenDistance } from '@/lib/voice';
@@ -55,7 +55,8 @@ export function GpsRunPage() {
   const toast = useToast();
   const [params] = useSearchParams();
   const settings = useSettings();
-  const gps = useGpsTracker({ autoPause: settings?.autoPause !== false });
+  // Pause automatique : désactivée par défaut (le chrono continue quand on s'arrête).
+  const gps = useGpsTracker({ autoPause: settings?.autoPause === true });
   const insights = useRunInsights();
   const customs = useLiveQuery(() => db.runWorkouts.toArray());
   const wake = useWakeLock(gps.status === 'running' || gps.status === 'paused');
@@ -63,6 +64,7 @@ export function GpsRunPage() {
   const workout = customs && insights ? resolveWorkout(workoutKey, insights.paces, customs) : null;
   const [type, setType] = useState<RunTypeKey | null>(null);
   const runType: RunTypeKey = type ?? workout?.runType ?? 'easy';
+  useEffect(() => gps.setMaxSpeed(maxSpeedFor(runType)), [runType, gps]);
   const [discarding, setDiscarding] = useState(false);
   const [picking, setPicking] = useState(false);
   // Course interrompue retrouvée : on demande quoi faire (reprendre, enregistrer, supprimer).
@@ -169,7 +171,7 @@ export function GpsRunPage() {
 
         {gps.status === 'idle' && (
           <Card className="!p-3.5">
-            <Toggle label={t.gpsx.autoPause} hint={t.gpsx.autoPauseHint} checked={settings?.autoPause !== false} onChange={(autoPause) => updateSettings({ autoPause })} />
+            <Toggle label={t.gpsx.autoPause} hint={t.gpsx.autoPauseHint} checked={settings?.autoPause === true} onChange={(autoPause) => updateSettings({ autoPause })} />
           </Card>
         )}
 

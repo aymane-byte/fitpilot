@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Bot, CircleAlert, CircleCheck, Info, MessagesSquare, Plus, SendHorizontal, Trash2, TriangleAlert } from 'lucide-react';
+import { Bot, Camera, CircleAlert, CircleCheck, Info, MessagesSquare, Plus, SendHorizontal, Trash2, TriangleAlert, X } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardTitle, Notice } from '@/components/Card';
 import { Sheet } from '@/components/Sheet';
@@ -9,7 +9,7 @@ import { db } from '@/db/db';
 import type { CoachMessage } from '@/db/types';
 import { useSettings } from '@/hooks/useData';
 import { fmt, num, t } from '@/i18n';
-import { askCoach, rulesProvider } from '@/lib/coach/providers';
+import { askCoach, DEFAULT_MODELS, geminiProvider, rulesProvider } from '@/lib/coach/providers';
 import { weeklyInsights, type Insight } from '@/lib/coach/rules';
 import { formatDateFr, toISODate } from '@/lib/dates';
 import { activeProvider, exerciseInfos, loadCoachContext } from './loadContext';
@@ -26,6 +26,15 @@ export function CoachPage() {
     return ctx ? weeklyInsights(ctx) : [];
   });
   const [input, setInput] = useState('');
+  // Photo jointe (compressée sur le téléphone avant l'envoi).
+  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
+  useEffect(
+    () => () => {
+      if (photo) URL.revokeObjectURL(photo.url);
+    },
+    [photo],
+  );
   const [busy, setBusy] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
@@ -34,11 +43,21 @@ export function CoachPage() {
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages?.length, busy]);
 
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    const { compressImage } = await import('../progress/photos');
+    const blob = await compressImage(file, 1024, 0.8);
+    setPhoto({ blob, url: URL.createObjectURL(blob) });
+    if (photoInput.current) photoInput.current.value = '';
+  }
+
   async function send(text: string) {
-    const content = text.trim();
+    const content = text.trim() || (photo ? t.coachx.photoDefault : '');
     if (!content || busy) return;
+    const image = photo;
     setBusy(true);
     setInput('');
+    setPhoto(null);
     try {
       let cid = conversationId;
       const now = Date.now();
@@ -46,15 +65,34 @@ export function CoachPage() {
         cid = (await db.coachConversations.add({ title: content.slice(0, 50), createdAt: now, updatedAt: now })) as number;
         setParams({ c: String(cid) }, { replace: true });
       }
-      await db.coachMessages.add({ conversationId: cid, role: 'user', provider: 'rules', content, createdAt: now });
+      const imageBytes = image ? { bytes: await image.blob.arrayBuffer(), type: image.blob.type || 'image/jpeg' } : undefined;
+      await db.coachMessages.add({ conversationId: cid, role: 'user', provider: 'rules', content, createdAt: now, ...(imageBytes ? { image: imageBytes } : {}) });
       const history = await db.coachMessages.where('conversationId').equals(cid).sortBy('createdAt');
-      const ctx = await loadCoachContext();
+      const ctx = await loadCoachContext(undefined, content);
       if (!ctx) return;
-      const { provider, model } = await activeProvider();
+      let { provider, model } = await activeProvider();
+      const hasGemini = !!(settings?.geminiApiKey || settings?.proxyUrl);
+      if (imageBytes && hasGemini && provider.id !== 'gemini') {
+        // Une photo ne peut être analysée que par Gemini : utilisé pour ce message, même si un autre fournisseur est choisi.
+        model = settings?.geminiModel || DEFAULT_MODELS.gemini;
+        provider = geminiProvider({ apiKey: settings?.geminiApiKey, model, proxyUrl: settings?.proxyUrl });
+      }
+      if (imageBytes && !hasGemini) {
+        await db.coachMessages.add({ conversationId: cid, role: 'assistant', provider: 'rules', content: t.coachx.photoNeedsGemini, createdAt: Date.now() });
+        await db.coachConversations.update(cid, { updatedAt: Date.now() });
+        return;
+      }
+      const toBase64 = (buf: ArrayBuffer) => {
+        const b = new Uint8Array(buf);
+        let s = '';
+        for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+        return btoa(s);
+      };
       const res = await askCoach({
         provider,
         fallback: rulesProvider(await exerciseInfos()),
-        turns: history.map((m) => ({ role: m.role, content: m.content })),
+        // Seule la dernière photo est envoyée (les plus anciennes ne repartent pas à chaque message).
+        turns: history.map((m, i) => ({ role: m.role, content: m.content, ...(m.image && i === history.length - 1 ? { image: { mime: m.image.type, base64: toBase64(m.image.bytes) } } : {}) })),
         ctx,
         model,
         online: navigator.onLine,
@@ -125,7 +163,19 @@ export function CoachPage() {
         }}
         className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-bg/95 px-4 py-2 backdrop-blur-xl"
       >
+        {photo && (
+          <div className="mx-auto mb-2 flex max-w-lg items-center gap-2" data-testid="photo-preview">
+            <img src={photo.url} alt={t.coachx.photoAlt} className="size-14 rounded-xl object-cover" />
+            <button type="button" aria-label={t.coachx.removePhoto} onClick={() => setPhoto(null)} className="grid size-9 place-items-center rounded-full bg-surface-2 text-muted">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        <input ref={photoInput} type="file" accept="image/*" className="sr-only" aria-label={t.coachx.attach} onChange={(e) => pickPhoto(e.target.files?.[0])} />
         <div className="mx-auto flex max-w-lg items-end gap-2">
+          <button type="button" aria-label={t.coachx.attach} onClick={() => photoInput.current?.click()} disabled={busy} className="grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-2 text-fg active:bg-line disabled:opacity-40">
+            <Camera size={20} />
+          </button>
           <label className="flex-1">
             <span className="sr-only">{c.placeholder}</span>
             <textarea
@@ -143,7 +193,7 @@ export function CoachPage() {
               className="max-h-32 min-h-12 w-full resize-none rounded-2xl border border-line bg-surface-2 px-4 py-3 text-fg outline-none placeholder:text-muted/70 focus:border-accent-text"
             />
           </label>
-          <button type="submit" disabled={busy || !input.trim()} aria-label={c.send} className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent text-accent-ink disabled:opacity-40">
+          <button type="submit" disabled={busy || (!input.trim() && !photo)} aria-label={c.send} className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent text-accent-ink disabled:opacity-40">
             <SendHorizontal size={20} />
           </button>
         </div>
@@ -174,7 +224,12 @@ function InsightsCard({ insights }: { insights: Insight[] }) {
 
 function Bubble({ m }: { m: CoachMessage }) {
   if (m.role === 'user') {
-    return <div className="ml-10 self-end rounded-3xl rounded-br-lg bg-accent px-4 py-2.5 text-[15px] whitespace-pre-line text-accent-ink">{m.content}</div>;
+    return (
+      <div className="ml-10 flex flex-col items-end gap-1 self-end">
+        {m.image && <MessagePhoto image={m.image} />}
+        <div className="rounded-3xl rounded-br-lg bg-accent px-4 py-2.5 text-[15px] whitespace-pre-line text-accent-ink">{m.content}</div>
+      </div>
+    );
   }
   const label = m.provider === 'rules' ? c.rulesLabel : fmt(c.llmLabel, { provider: c.providers[m.provider], model: m.model ?? '' });
   return (
@@ -191,6 +246,16 @@ function Bubble({ m }: { m: CoachMessage }) {
       </p>
     </div>
   );
+}
+
+function MessagePhoto({ image }: { image: { bytes: ArrayBuffer; type: string } }) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    const u = URL.createObjectURL(new Blob([image.bytes], { type: image.type }));
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [image]);
+  return url ? <img src={url} alt={t.coachx.photoAlt} className="max-h-48 rounded-2xl object-cover" data-testid="msg-photo" /> : null;
 }
 
 function ConversationsSheet({ open, onClose, current, onPick }: { open: boolean; onClose: () => void; current?: number; onPick: (id?: number) => void }) {

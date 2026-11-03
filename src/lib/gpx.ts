@@ -1,5 +1,6 @@
 // Import / export GPX 1.1 (Strava, montres, applis de course). Analyse avec DOMParser, sans dépendance.
 import type { TrackPoint } from './runAnalysis';
+import { typeFromActivity } from './runTypes';
 
 export interface ImportedTrack {
   name?: string;
@@ -43,7 +44,6 @@ ${body}
 `;
 }
 
-const NON_RUN = /cycl|bik|ride|vélo|velo|swim|natation|ski|drive/i;
 
 export function parseGpx(text: string): ImportedTrack {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
@@ -52,7 +52,7 @@ export function parseGpx(text: string): ImportedTrack {
   const trk = byName(doc, 'trk')[0];
   const name = trk ? byName(trk, 'name')[0]?.textContent?.trim() : undefined;
   const activity = trk ? byName(trk, 'type')[0]?.textContent?.trim() : undefined;
-  if (activity && NON_RUN.test(activity)) throw new TrackImportError('notRun');
+  if (activity && !typeFromActivity(activity)) throw new TrackImportError('notRun');
   const points: TrackPoint[] = [];
   let missingTime = 0;
   byName(doc, 'trkseg').forEach((seg, s) => {

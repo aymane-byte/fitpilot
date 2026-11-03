@@ -38,7 +38,8 @@ test('pause automatique au feu rouge puis reprise ; écran d’enregistrement', 
   await context.setGeolocation({ latitude: 33.5, longitude: -7.6, accuracy: 5 });
   await completeOnboarding(page);
   await page.goto('./#/course/gps');
-  await expect(page.getByLabel(/^Pause automatique/)).toBeChecked();
+  // Désactivée par défaut : on l'active pour ce test.
+  await page.getByLabel(/^Pause automatique/).check();
   await page.getByRole('button', { name: 'Démarrer' }).click();
   await expect(page.getByTestId('keep-on')).toContainText('Garde l’écran allumé');
   let lat = await move(context, 33.5, 20, 4);

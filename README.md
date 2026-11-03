@@ -48,9 +48,10 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 - Historique, records, 1RM estimé (formule d'Epley), courbe de progression.
 
 ### Course
+- **Types d'activité** : footing, tempo, fractionné, sortie longue, récupération, **marche, randonnée, vélo**. Le vélo accepte des vitesses plus élevées. Calories estimées selon l'activité. Records et VDOT ne comptent que la course à pied. L'import GPX/FIT reconnaît le type du fichier.
 - Saisie manuelle (allure, vitesse, calories estimées, chaussures, effort ressenti) ou **suivi GPS** avec carte vectorielle (MapLibre + OpenFreeMap). Les points GPS imprécis ou impossibles sont filtrés, et l'écran reste allumé quand l'iPhone le permet.
 - **Écran d'enregistrement** : temps en très grand, distance, allure actuelle et moyenne, carte en direct, gros boutons Pause et Terminer, et bannière permanente « Garde l'écran allumé ».
-- **Pause automatique** (désactivable) : après ~10 s immobile (feu rouge), le chrono s'arrête et le temps d'arrêt n'est pas compté. Il reprend dès que tu t'éloignes de 12 m. Une annonce vocale signale la pause et la reprise.
+- **Pause automatique** (option, **désactivée par défaut** : le chrono continue quand tu t'arrêtes) : une fois activée, après ~10 s immobile (feu rouge), le chrono s'arrête et le temps d'arrêt n'est pas compté. Il reprend dès que tu t'éloignes de 12 m. Une annonce vocale signale la pause et la reprise.
 - **Rien n'est perdu** : l'état de la course et les points GPS sont écrits dans IndexedDB toutes les 5 s, et tout de suite quand l'app passe en arrière-plan. Si FitPilot est fermée ou rechargée en pleine course, l'enregistrement **reprend automatiquement**. Une course mise en pause propose « Reprendre / Enregistrer / Supprimer ».
 - **Chrono exact** : le temps est calculé à partir des horodatages (départ, pauses, reprises), jamais en comptant des secondes. Il reste juste même si iOS a suspendu l'app.
 - **Trous GPS** : plus de 30 s sans position pendant la course (écran verrouillé, app en arrière-plan) déclenche le message « GPS interrompu pendant X min ». Les deux points sont reliés par une ligne droite estimée, en pointillés sur la carte. La distance estimée apparaît à part dans le détail, et tu choisis de garder ou de retirer cette partie, pendant la course comme après.
@@ -105,7 +106,7 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
 - **Recherche par mots** : ordre libre, sans accents ni pluriels, début de mot suffisant, « sans » = « non » (« thé sans sucre » trouve « Thé infusé, non sucré », jamais « Thé sucré »). Des résultats approchés s'affichent pour les requêtes de 3 mots ou plus.
 - **Table CIQUAL 2020** (ANSES, Licence Ouverte) : 2 298 aliments avec une énergie officielle, cherchés en même temps que tes aliments. Le fichier (82 Ko compressé) est disponible hors-ligne. Un aliment CIQUAL n'est copié dans ta base que lorsque tu l'utilises : tes aliments marocains et tes valeurs modifiées ne sont jamais écrasés.
 - **Scanner de code-barres** (ZXing, fonctionne dans Safari iOS) avec recherche sur **Open Food Facts**. Si la caméra n'est pas disponible : photo du code ou saisie des chiffres. Les produits trouvés sont gardés sur le téléphone : un produit déjà scanné se retrouve hors-ligne.
-- **Micronutriments** : fibres, sucres, sel/sodium, graisses saturées, fer, calcium, potassium, vitamines D et B12, avec des repères selon ton profil (ANSES / EFSA, OMS pour le sel). L'app indique quelle part des aliments est renseignée : une valeur inconnue n'est jamais comptée comme 0.
+- **Micronutriments** (les repas notés avant leur arrivée sont recalculés automatiquement une fois) : fibres, sucres, sel/sodium, graisses saturées, fer, calcium, potassium, vitamines D et B12, avec des repères selon ton profil (ANSES / EFSA, OMS pour le sel). L'app indique quelle part des aliments est renseignée : une valeur inconnue n'est jamais comptée comme 0.
 - **Favoris, récents, repas fréquents** (mêmes aliments notés au moins 2 fois) et **ajout rapide** en kcal/macros, marqué « estimation ».
 - **Recettes** : ingrédients en poids cru, poids cuit du plat fini, nombre de portions (unité « portion »).
 - **Menus de la semaine** et **liste de courses** générée automatiquement. Les recettes sont remplacées par leurs ingrédients crus. Budget estimé en dirhams, avec des prix indicatifs modifiables pour les aliments fournis.
@@ -125,6 +126,8 @@ Les 6 phases de départ et la deuxième série (A : course avancée, B : nutriti
   - les conflits du planning et les incohérences entre ton objectif et tes données ;
   - l'explication des exercices et le bilan de la semaine.
 - En option, **Gemini** ou **Groq** avec ta clé gratuite. L'app envoie seulement un résumé compact (profil + 14 derniers jours). Délai maximal, limitation de débit, affichage des tokens, et **repli automatique sur les règles** en cas d'erreur, de quota atteint ou d'absence d'internet.
+- **Questions sur un aliment**, en français ou en darija (« wach nakol amlou ? chhal ? ») : le coach retrouve l'aliment dans tes aliments, puis dans la table CIQUAL. Il dit s'il convient à ton objectif, comment le manger et la quantité conseillée (en grammes et en unité maison : tranche de khobz, datte…).
+- **Photo dans le chat** : joins une photo (plat, étiquette…), le coach Gemini l'analyse. Il faut une clé Gemini ; sans clé, l'app l'explique et ne fait pas semblant.
 - Le coach à règles utilise aussi :
   - la charge d'entraînement (surcharge, rampe trop rapide, fraîcheur) et le VDOT ;
   - les micronutriments des 7 derniers jours (fibres, sel, sucres, fer, calcium), avec des aliments marocains suggérés, mais seulement si assez d'aliments sont renseignés ;

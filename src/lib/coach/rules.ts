@@ -7,6 +7,7 @@ import { normalizeText } from '../text';
 import { formatPace } from '../running';
 import { microStatus } from '../micros';
 import type { CoachContext } from './context';
+import { FOOD_QUESTION, foodAdvice } from './foodAdvice';
 
 const R = t.rules;
 
@@ -284,6 +285,12 @@ export function findExercise(message: string, exercises: ExerciseInfo[]): Exerci
 export function rulesReply(message: string, ctx: CoachContext, exercises: ExerciseInfo[] = []): string {
   if (isMedical(message)) return `${R.medical}\n\n${t.coach.disclaimer}`;
   if (asksTooFewCalories(message, ctx.raw.targets.bmr)) return fmt(R.lowCalories, { bmr: ctx.raw.targets.bmr, kcal: num(ctx.raw.targets.calories, 0) });
+
+  // Question sur un aliment cité (« wach nakol dattes ? », « combien de khobz ? »).
+  const food = ctx.raw.extra?.food;
+  if (food && (FOOD_QUESTION.test(normalizeText(message)) || FOOD_QUESTION.test(message))) {
+    return foodAdvice(food, ctx.raw.targets, ctx.raw.profile.goal, { ramadan: !!ctx.raw.extra?.ramadan });
+  }
 
   const ex = findExercise(message, exercises);
   if (ex) {

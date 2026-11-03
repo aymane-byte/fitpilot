@@ -1,3 +1,4 @@
+import { isRunning, KCAL_PER_KG_KM } from './runTypes';
 // Course : allure, vitesse, durées, calories estimées, records.
 
 /** Allure en secondes par km. */
@@ -48,13 +49,14 @@ export function parseDuration(input: string): number | undefined {
  * Calories estimées : ~1 kcal par kg et par km (règle classique pour la course à pied).
  * C'est une ESTIMATION : elle dépend du terrain, du vent, de l'efficacité de foulée.
  */
-export function runCaloriesEstimate(weightKg: number, distanceKm: number): number {
-  return Math.round(weightKg * distanceKm);
+export function runCaloriesEstimate(weightKg: number, distanceKm: number, type?: string): number {
+  return Math.round(weightKg * distanceKm * (KCAL_PER_KG_KM[type ?? ''] ?? 1));
 }
 
 export interface RunLike {
   id?: number;
   date: string;
+  type?: string;
   distanceKm: number;
   durationSec: number;
   /** Meilleurs temps mesurés par GPS sur ces distances (secondes), si disponibles. */
@@ -80,8 +82,10 @@ export interface RunRecord {
  * Records 1 km / 5 km / 10 km : meilleur segment GPS si disponible,
  * sinon allure moyenne × distance pour une sortie au moins aussi longue.
  */
-export function runRecords(runs: RunLike[]): Partial<Record<RecordDistance, RunRecord>> & { longest?: RunLike } {
+export function runRecords(all: RunLike[]): Partial<Record<RecordDistance, RunRecord>> & { longest?: RunLike } {
   const out: Partial<Record<RecordDistance, RunRecord>> & { longest?: RunLike } = {};
+  // Records de course à pied uniquement (une sortie à vélo ne bat pas un record du 5 km).
+  const runs = all.filter((r) => isRunning(r.type));
   for (const r of runs) {
     if (!out.longest || r.distanceKm > out.longest.distanceKm) out.longest = r;
     for (const key of Object.keys(RECORD_KM) as RecordDistance[]) {

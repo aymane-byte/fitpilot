@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { haversine, movingTime, rejectReason, totalDistance } from '@/lib/geo';
+import { GPS_FILTER, haversine, movingTime, rejectReason, totalDistance } from '@/lib/geo';
 import type { TrackPoint } from '@/lib/runAnalysis';
 import { autoPauseDecide, type RawFix } from '@/lib/track';
 import { elapsedMs, GAP_MIN_SEC } from '@/lib/liveRun';
@@ -43,7 +43,7 @@ const IDLE: Draft = { status: 'idle', points: [], seg: 0, activeMs: 0, resumedAt
  * - trous GPS (app suspendue, écran verrouillé) détectés : ligne droite estimée, à garder ou retirer ;
  * - pause automatique facultative quand on s'arrête.
  */
-export function useGpsTracker(opts: { autoPause?: boolean } = {}) {
+export function useGpsTracker(opts: { autoPause?: boolean; maxSpeed?: number } = {}) {
   const [draft, setDraft] = useState<Draft>(IDLE);
   const [loaded, setLoaded] = useState(false);
   const [recovered, setRecovered] = useState(false);
@@ -55,8 +55,11 @@ export function useGpsTracker(opts: { autoPause?: boolean } = {}) {
   const watchId = useRef<number | null>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
-  const autoRef = useRef(opts.autoPause !== false);
-  autoRef.current = opts.autoPause !== false;
+  const autoRef = useRef(opts.autoPause === true);
+  autoRef.current = opts.autoPause === true;
+  // Vitesse maximale crédible : plus élevée à vélo (sinon les points seraient rejetés).
+  const speedRef = useRef(opts.maxSpeed);
+
   const recent = useRef<RawFix[]>([]);
   const lastSave = useRef(0);
   const flushed = useRef(0);
@@ -174,7 +177,7 @@ export function useGpsTracker(opts: { autoPause?: boolean } = {}) {
         update((x) => ({ ...x, points: [...x.points, p], pendingGap: gap }), { force: true });
         return;
       }
-      const reason = rejectReason(prev, p);
+      const reason = rejectReason(prev, p, { ...GPS_FILTER, maxSpeed: speedRef.current ?? GPS_FILTER.maxSpeed });
       if (reason === 'jitter') return; // bruit à l'arrêt : ni gardé ni compté comme rejet
       setSuspendedSec(null);
       update((x) => (reason ? { ...x, rejected: x.rejected + 1 } : { ...x, points: [...x.points, p] }));
@@ -274,6 +277,10 @@ export function useGpsTracker(opts: { autoPause?: boolean } = {}) {
     keepGap,
     removeGap,
     reset,
+    /** Vitesse maximale crédible selon l'activité (vélo plus rapide). */
+    setMaxSpeed: (v: number) => {
+      speedRef.current = v;
+    },
   };
 }
 

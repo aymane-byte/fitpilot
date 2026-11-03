@@ -78,9 +78,9 @@ test('fichier non course refusé', async ({ page }) => {
   await completeOnboarding(page);
   await page.goto('./#/course');
   await page.getByRole('button', { name: /Importer/ }).click();
-  const bike = gpxFixture().replace('<type>running</type>', '<type>cycling</type>');
-  await page.locator('input[type=file]').setInputFiles({ name: 'velo.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(bike) });
-  await expect(page.getByText(/pas une course à pied/)).toBeVisible();
+  const bike = gpxFixture().replace('<type>running</type>', '<type>swimming</type>');
+  await page.locator('input[type=file]').setInputFiles({ name: 'natation.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(bike) });
+  await expect(page.getByText(/Activité non prise en charge/)).toBeVisible();
 });
 
 test('forme, VDOT et prédictions après import', async ({ page }) => {

@@ -7,6 +7,8 @@ export type ProviderId = 'rules' | 'gemini' | 'groq';
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
+  /** Photo jointe (JPEG compressé, base64) : envoyée à Gemini seulement. */
+  image?: { mime: string; base64: string };
 }
 
 export interface Usage {
@@ -65,6 +67,9 @@ export function systemPrompt(ctx: CoachContext): string {
     `- Jamais de calories sous le BMR (${ctx.raw.targets.bmr} kcal) ; perte de poids max 0,5–1 % du poids par semaine.`,
     '- Pas de surentraînement : au moins 1–2 jours de repos par semaine, pas de jambes lourdes la veille d’une course.',
     '- Respecte les allergies et blessures indiquées. Cuisine marocaine familiale bienvenue.',
+    'Si l’utilisateur écrit en darija, réponds en français simple (quelques mots de darija bienvenus).',
+    'Si un aliment est cité (alimentCite), dis s’il convient à son objectif, comment le manger et la quantité conseillée en grammes et en unité maison.',
+    'Si une photo est jointe, décris les aliments visibles et estime les quantités en précisant que c’est une estimation.',
     'Données (JSON compact, 14 derniers jours) :',
     compactSummary(ctx),
   ].join('\n');
@@ -91,7 +96,10 @@ export function geminiProvider(cfg: ProviderConfig): CoachProvider {
       if (!cfg.apiKey && !cfg.proxyUrl) throw new ProviderError('noKey');
       const body = {
         systemInstruction: { parts: [{ text: systemPrompt(ctx) }] },
-        contents: turns.slice(-MAX_TURNS).map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+        contents: turns.slice(-MAX_TURNS).map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }, ...(m.image ? [{ inline_data: { mime_type: m.image.mime, data: m.image.base64 } }] : [])],
+        })),
         generationConfig: { temperature: 0.5, maxOutputTokens: MAX_OUTPUT_TOKENS },
       };
       const url = cfg.proxyUrl

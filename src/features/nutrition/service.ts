@@ -1,4 +1,4 @@
-import { db } from '@/db/db';
+import { db, updateSettings } from '@/db/db';
 import type { Food, MealItem, MealPlanItem, MealType, Recipe } from '@/db/types';
 import { addDays, startOfWeek, type ISODate } from '@/lib/dates';
 import { nutrientsFor, recipeMicrosPer100g, recipePer100g, sumNutrients, type DayNutrition, type Nutrients } from '@/lib/nutrition';
@@ -119,6 +119,32 @@ export async function addFrequentMeal(date: ISODate, type: MealType, meal: Frequ
     const rows = meal.items.map((i, k) => (foods[k] ? { ...itemFor(foods[k]!, i.grams), mealId: id } : null)).filter((x): x is MealItem => !!x);
     await db.mealItems.bulkAdd(rows);
   });
+}
+
+/**
+ * Repas notés avant l'arrivée des micronutriments (ou avant que l'aliment en ait) : on recalcule
+ * fibres, sel, fer… d'après l'aliment actuel et la quantité notée. Une seule fois par appareil.
+ * Les ajouts rapides et aliments sans micronutriments restent « inconnus ».
+ */
+export async function backfillItemMicros(): Promise<number> {
+  const s = await db.settings.get('app');
+  if ((s?.microsBackfill ?? 0) >= 1) return 0;
+  const items = await db.mealItems.filter((i) => i.foodId !== QUICK_FOOD_ID && MICRO_KEYS.every((k) => i[k] === undefined)).toArray();
+  const foods = new Map((await db.foods.bulkGet([...new Set(items.map((i) => i.foodId))])).filter((f): f is Food => !!f).map((f) => [f.id!, f]));
+  let n = 0;
+  await db.transaction('rw', db.mealItems, db.settings, async () => {
+    for (const i of items) {
+      const f = foods.get(i.foodId);
+      if (!f) continue;
+      const m = microsFor(f, i.grams);
+      if (Object.keys(m).length) {
+        await db.mealItems.update(i.id!, m);
+        n++;
+      }
+    }
+    await updateSettings({ microsBackfill: 1 });
+  });
+  return n;
 }
 
 /** Micronutriments d'une journée. */

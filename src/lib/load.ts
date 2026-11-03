@@ -17,7 +17,7 @@ import { addDays, daysBetween, type ISODate } from './dates';
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
 
-export const TYPE_IF: Record<string, number> = { recovery: 0.65, easy: 0.72, long: 0.75, tempo: 0.88, intervals: 0.92 };
+export const TYPE_IF: Record<string, number> = { recovery: 0.65, easy: 0.72, long: 0.75, tempo: 0.88, intervals: 0.92, walk: 0.45, hike: 0.6, bike: 0.62 };
 
 export interface LoadRun {
   date: ISODate;
@@ -32,7 +32,8 @@ export type IfBasis = 'rpe' | 'pace' | 'type';
 
 export function intensityFactor(run: LoadRun, thresholdPaceSec?: number): { value: number; basis: IfBasis } {
   if (run.rpe && run.rpe >= 1 && run.rpe <= 10) return { value: Math.round((0.5 + 0.06 * run.rpe) * 100) / 100, basis: 'rpe' };
-  if (thresholdPaceSec && run.distanceKm > 0 && run.durationSec > 0) {
+  // Allure comparée au seuil de course : n'a de sens que pour la course à pied.
+  if (thresholdPaceSec && run.distanceKm > 0 && run.durationSec > 0 && (!run.type || TYPE_IF[run.type] === undefined || ['easy', 'tempo', 'intervals', 'long', 'recovery'].includes(run.type))) {
     const pace = run.durationSec / run.distanceKm;
     return { value: Math.round(Math.min(1.2, Math.max(0.5, thresholdPaceSec / pace)) * 100) / 100, basis: 'pace' };
   }

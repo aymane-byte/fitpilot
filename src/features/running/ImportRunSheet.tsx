@@ -31,7 +31,9 @@ export function ImportRunSheet({ open, onClose }: { open: boolean; onClose: () =
     setError(undefined);
     setPreview(undefined);
     try {
-      setPreview(await readTrackFile(file));
+      const p = await readTrackFile(file);
+      setPreview(p);
+      setType(p.suggestedType);
     } catch (e) {
       setError(x.importErr[e instanceof TrackImportError ? e.code : 'invalid']);
     } finally {

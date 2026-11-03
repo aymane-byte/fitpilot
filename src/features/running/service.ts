@@ -12,10 +12,8 @@ import { detectGaps, estimatedDistanceM, removeGap } from '@/lib/liveRun';
 import type { FavoriteRoute } from '@/db/types';
 import { demSampleIndices, elevationUrls, interpolateAltitudes, pickWeather, weatherUrl } from '@/lib/openMeteo';
 import { TrackImportError, type ImportedTrack } from '@/lib/gpx';
-import { RUN_TYPES } from '@/lib/runTypes';
+import { maxSpeedFor, minPaceFor, RUN_TYPES, typeFromActivity, type RunTypeKey } from '@/lib/runTypes';
 
-/** Allure minimale crédible : 2:30 /km (plus rapide que le record du monde du 1 500 m). */
-const MIN_PACE_SEC = 150;
 /** Incrémenter quand l'analyse d'une course change : les anciennes courses sont recalculées. */
 export const ANALYSIS_VERSION = 3;
 
@@ -29,7 +27,8 @@ export const runEntrySchema = z
     rpe: z.number().int().min(1).max(10).optional(),
     shoeId: z.number().int().positive().optional(),
   })
-  .refine((r) => r.durationSec / r.distanceKm >= MIN_PACE_SEC, { message: t.run.errPace, path: ['durationSec'] });
+  // Allure minimale crédible : 2:30 /km à pied (plus rapide que le record du 1 500 m), 90 km/h à vélo.
+  .refine((r) => r.durationSec / r.distanceKm >= minPaceFor(r.type), { message: t.run.errPace, path: ['durationSec'] });
 
 export type RunEntry = z.infer<typeof runEntrySchema>;
 
@@ -257,17 +256,19 @@ export interface ImportPreview {
   hasAltitude: boolean;
   /** Course déjà présente (même heure de départ à 2 min près). */
   duplicateOf?: number;
+  /** Type proposé d'après le fichier (vélo, marche, rando, course). */
+  suggestedType: RunTypeKey;
 }
 
 /** Points aberrants d'une trace importée (sauts de position) retirés ; pauses détectées. */
-export function cleanImportedTrack(track: ImportedTrack): TrackPoint[] {
+export function cleanImportedTrack(track: ImportedTrack, maxSpeed = GPS_FILTER.maxSpeed): TrackPoint[] {
   const kept: TrackPoint[] = [];
   for (const p of track.points) {
     const last = kept.at(-1);
     if (last && (last.seg ?? 0) === (p.seg ?? 0)) {
       const dt = (p.t - last.t) / 1000;
       if (dt <= 0) continue;
-      if (haversine(last, p) / dt > GPS_FILTER.maxSpeed) continue;
+      if (haversine(last, p) / dt > maxSpeed) continue;
     }
     kept.push(p);
   }
@@ -303,7 +304,8 @@ export async function readTrackFile(input: File): Promise<ImportPreview> {
     track = parseGpx(await file.text());
     format = 'gpx';
   } else throw new TrackImportError('invalid');
-  const points = cleanImportedTrack(track);
+  const suggestedType = typeFromActivity(track.activity) ?? 'easy';
+  const points = cleanImportedTrack(track, maxSpeedFor(suggestedType));
   if (points.length < 2) throw new TrackImportError('empty');
   const distM = totalDistance(points);
   // Temps en mouvement : celui de la montre (FIT) si fourni, sinon calculé (pauses exclues).
@@ -321,6 +323,7 @@ export async function readTrackFile(input: File): Promise<ImportPreview> {
     format,
     hasAltitude: altitudeCoverage(points.map((p) => p.alt)) >= 0.5,
     duplicateOf: dup?.id,
+    suggestedType,
   };
 }
 

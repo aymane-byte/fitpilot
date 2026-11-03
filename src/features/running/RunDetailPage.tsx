@@ -134,7 +134,7 @@ export function RunDetailPage() {
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted">
           {weight && (
             <span>
-              {r.calories} : <span className="num font-semibold text-fg">≈ {runCaloriesEstimate(weight, run.distanceKm)} kcal</span> ({r.caloriesEstimate})
+              {r.calories} : <span className="num font-semibold text-fg">≈ {runCaloriesEstimate(weight, run.distanceKm, run.type)} kcal</span> ({r.caloriesEstimate})
             </span>
           )}
           {shoe && <span>{x.shoe} : <span className="font-medium text-fg">{shoe.name}</span></span>}

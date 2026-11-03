@@ -2,6 +2,7 @@
 // chargé à la demande pour ne pas alourdir l'app.
 import { TrackImportError, type ImportedTrack } from './gpx';
 import type { TrackPoint } from './runAnalysis';
+import { typeFromActivity } from './runTypes';
 
 interface FitRecord {
   timestamp?: Date | string | number;
@@ -21,7 +22,7 @@ interface FitSession {
 export function trackFromFitData(data: { records?: FitRecord[]; sessions?: FitSession[] }): ImportedTrack {
   const session = data.sessions?.[0];
   const sport = session?.sport;
-  if (typeof sport === 'string' && sport !== 'running' && sport !== 'generic' && sport !== 'walking' && sport !== 'hiking') throw new TrackImportError('notRun');
+  if (typeof sport === 'string' && !typeFromActivity(sport)) throw new TrackImportError('notRun');
   const points: TrackPoint[] = [];
   for (const r of data.records ?? []) {
     const lat = r.position_lat;

@@ -407,7 +407,9 @@ describe('GPX et FIT', () => {
     expect(code('pas du xml')).toBe('invalid');
     expect(code('<gpx></gpx>')).toBe('empty');
     expect(code('<gpx><trk><trkseg><trkpt lat="1" lon="2"></trkpt></trkseg></trk></gpx>')).toBe('noTime');
-    expect(code('<gpx><trk><type>cycling</type><trkseg><trkpt lat="1" lon="2"><time>2026-01-01T00:00:00Z</time></trkpt></trkseg></trk></gpx>')).toBe('notRun');
+    expect(code('<gpx><trk><type>swimming</type><trkseg><trkpt lat="1" lon="2"><time>2026-01-01T00:00:00Z</time></trkpt></trkseg></trk></gpx>')).toBe('notRun');
+    // Vélo, marche et rando sont acceptés (type proposé à l'import).
+    expect(code('<gpx><trk><type>cycling</type><trkseg><trkpt lat="1" lon="2"><time>2026-01-01T00:00:00Z</time></trkpt></trkseg></trk></gpx>')).toBe('ok');
   });
   it('FIT : fichier encodé puis relu (enregistrements, altitude, session)', async () => {
     const semi = (deg: number) => Math.round((deg * 2 ** 31) / 180);
@@ -444,10 +446,49 @@ describe('GPX et FIT', () => {
     expect(track.distanceM).toBe(22);
   });
   it('FIT de vélo ou sans GPS refusé', () => {
-    expect(() => trackFromFitData({ sessions: [{ sport: 'cycling' }], records: [] })).toThrow(TrackImportError);
+    expect(() => trackFromFitData({ sessions: [{ sport: 'swimming' }], records: [] })).toThrow(TrackImportError);
     expect(() => trackFromFitData({ records: [{ timestamp: new Date() }] })).toThrow(TrackImportError);
   });
   it('fichier FIT corrompu refusé proprement', async () => {
     await expect(parseFit(new Uint8Array([1, 2, 3]).buffer)).rejects.toBeInstanceOf(TrackImportError);
+  });
+});
+
+describe('types d’activité (marche, rando, vélo)', async () => {
+  const { typeFromActivity, maxSpeedFor, minPaceFor, isRunning } = await import('./runTypes');
+  const { runCaloriesEstimate, runRecords } = await import('./running');
+  const { performancesFromRuns } = await import('./vdot');
+  it('type déduit du fichier importé', () => {
+    expect(typeFromActivity('cycling')).toBe('bike');
+    expect(typeFromActivity('Ride')).toBe('bike');
+    expect(typeFromActivity('walking')).toBe('walk');
+    expect(typeFromActivity('hiking')).toBe('hike');
+    expect(typeFromActivity('running')).toBe('easy');
+    expect(typeFromActivity(undefined)).toBe('easy');
+    expect(typeFromActivity('swimming')).toBeNull();
+  });
+  it('limites GPS et allure selon l’activité', () => {
+    expect(maxSpeedFor('bike')).toBe(25);
+    expect(maxSpeedFor('walk')).toBe(8.5);
+    expect(minPaceFor('bike')).toBe(40);
+    expect(minPaceFor('easy')).toBe(150);
+    expect(isRunning('walk')).toBe(false);
+    expect(isRunning('tempo')).toBe(true);
+  });
+  it('calories selon l’activité', () => {
+    expect(runCaloriesEstimate(78, 10)).toBe(780);
+    expect(runCaloriesEstimate(78, 10, 'walk')).toBe(429);
+    expect(runCaloriesEstimate(78, 20, 'bike')).toBe(468);
+  });
+  it('marche et vélo exclus des records et du VDOT', () => {
+    const runs = [
+      { id: 1, date: '2026-10-01', type: 'bike', distanceKm: 20, durationSec: 2400, bestEfforts: { '5k': 500 } },
+      { id: 2, date: '2026-10-02', type: 'easy', distanceKm: 5, durationSec: 1600 },
+      { id: 3, date: '2026-10-03', type: 'walk', distanceKm: 30, durationSec: 20000 },
+    ];
+    const recs = runRecords(runs);
+    expect(recs['5k']?.runId).toBe(2);
+    expect(recs.longest?.id).toBe(2);
+    expect(performancesFromRuns(runs).every((p) => p.runId === 2)).toBe(true);
   });
 });

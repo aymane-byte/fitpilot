@@ -13,6 +13,8 @@ export default defineConfig({
   base: './',
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  // Syntaxe compilée pour Safari 15 (iOS 15) : l'app fonctionne aussi sur des iPhone moins récents.
+  build: { target: ['es2020', 'safari15'] },
   plugins: [
     react(),
     tailwindcss(),

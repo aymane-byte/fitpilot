@@ -44,7 +44,9 @@ export interface Settings {
   /** Calories différentes les jours d'entraînement et de repos (même moyenne sur la semaine). */
   calorieCycling?: { enabled: boolean; pct: number };
   ramadan?: RamadanSettings;
-  /** Pause et reprise automatiques pendant la course GPS (activé par défaut). */
+  /** Repas notés avant l'ajout des micronutriments : recalculés une fois (1 = fait). */
+  microsBackfill?: number;
+  /** Pause et reprise automatiques pendant la course GPS (désactivée par défaut). */
   autoPause?: boolean;
   /** Liste de courses : aliments cochés, par semaine (lundi ISO). */
   shoppingChecked?: Record<string, number[]>;
@@ -111,7 +113,7 @@ export interface WorkoutSet {
   targetRpe?: number;
 }
 
-export type RunType = 'easy' | 'tempo' | 'intervals' | 'long' | 'recovery';
+export type RunType = 'easy' | 'tempo' | 'intervals' | 'long' | 'recovery' | 'walk' | 'hike' | 'bike';
 
 export interface Run {
   id?: number;
@@ -367,4 +369,6 @@ export interface CoachMessage {
   tokens?: number;
   /** Raison du repli sur les règles si le fournisseur choisi a échoué. */
   fallbackReason?: string;
+  /** Photo jointe au message (JPEG compressé, gardé sur le téléphone). */
+  image?: { bytes: ArrayBuffer; type: string };
 }
